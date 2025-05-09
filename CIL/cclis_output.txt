@@ -1,0 +1,44 @@
+Start Training current task 0
+/home/kouyou/Datasets/
+/home/kouyou/ContinualLearning/survey/CIL
+Files already downloaded and verified
+replauy_indices:  []
+target_classes [0, 1]
+Files already downloaded and verified
+uc[np.argsort(uk)] [5000 5000]
+target_classes [0, 1]
+Files already downloaded and verified
+uc[np.argsort(uk)] [5000 5000]
+no separate sampler
+Files already downloaded and verified
+[0 1]
+[5000 5000]
+[0, 1]
+Files already downloaded and verified
+[5000 5000]
+[0, 1]
+Files already downloaded and verified
+[5000 5000]
+len(dataloader):  20
+len(train_loader):  20
+idx:  0
+idx:  1
+idx:  2
+idx:  3
+idx:  4
+idx:  5
+idx:  6
+idx:  7
+idx:  8
+idx:  9
+idx:  10
+idx:  11
+idx:  12
+idx:  13
+idx:  14
+idx:  15
+idx:  16
+idx:  17
+idx:  18
+idx:  19
+Train: [1][20/20]	loss 5.588 (6.216)	lr 0.00082

@@ -1,0 +1,9 @@
+CIL/logs/
+
+__pycache__/
+*.pyc
+*.pkl
+*.npy
+*.pt
+*.log
+.vscode/
