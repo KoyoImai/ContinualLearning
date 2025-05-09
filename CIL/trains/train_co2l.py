@@ -102,7 +102,7 @@ def val_co2l(opt, model, model2, linear_loader, val_loader, taskil_loaders, epoc
     
     # classifierのOptimizer
     optimizer = optim.SGD(classifier.parameters(),
-                          lr=opt.learning_rate,
+                          lr=opt.linear_lr,
                           momentum=opt.momentum,
                           weight_decay=opt.weight_decay)
 

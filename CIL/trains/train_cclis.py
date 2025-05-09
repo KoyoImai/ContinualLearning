@@ -170,7 +170,7 @@ def train_cclis(opt, model, model2, criterion, optimizer, scheduler, train_loade
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        # scheduler.step()
+        scheduler.step()
 
         # 学習記録の表示
         if (idx+1) % opt.print_freq == 0 or idx+1 == len(train_loader):
@@ -193,8 +193,8 @@ def val_cclis(opt, model, model2, linear_loader, val_loader, taskil_loaders, epo
     
     # classifierのOptimizer
     optimizer = optim.SGD(classifier.parameters(),
-                          lr=opt.learning_rate,
-                          momentum=opt.momentum,
+                          lr=opt.linear_lr,
+                          momentum=opt.linear_momentum,
                           weight_decay=opt.weight_decay)
 
     # schedulerの設定

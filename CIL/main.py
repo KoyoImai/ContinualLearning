@@ -59,6 +59,7 @@ def parse_option():
     # classifierの学習条件(Co2Lなど線形分類で後から評価する手法用)
     parser.add_argument('--linear_epochs', type=int, default=100)
     parser.add_argument('--linear_lr', type=float, default=0.1)
+    parser.add_argument('--linear_momentum', type=float, default=0.9)
     parser.add_argument('--linear_batch_size', type=int, default=256)
 
     # 継続学習的設定
@@ -410,15 +411,32 @@ def make_scheduler(opt, epochs, dataloader, method_tools):
 
     if opt.method in ["er", "gpm"]:
         scheduler = None
-    elif opt.method in ["co2l", "cclis", "supcon", "supcon-joint", "cclis-wo", "cclis-wo-ss", "cclis-wo-is"]:
+    
+    elif opt.method in ["co2l"]:
         print("len(dataloader): ", len(dataloader))
-        total_steps = epochs * len(dataloader)
         if opt.target_task == 0:
-            scheduler = lr_scheduler.OneCycleLR(optimizer, max_lr=0.02, total_steps=total_steps, pct_start=0.1, anneal_strategy='cos')
+            total_steps = opt.start_epoch * len(dataloader)
+            pct_start = (10 * len(dataloader)) / total_steps
+            scheduler = lr_scheduler.OneCycleLR(optimizer, max_lr=opt.learning_rate, total_steps=total_steps, pct_start=pct_start, anneal_strategy='cos')
         else:
-            scheduler = lr_scheduler.OneCycleLR(optimizer, max_lr=0.1, total_steps=total_steps, pct_start=0.1, anneal_strategy='cos')
+            total_steps = opt.epochs * len(dataloader)
+            pct_start = (10 * len(dataloader)) / total_steps
+            scheduler = lr_scheduler.OneCycleLR(optimizer, max_lr=opt.learning_rate, total_steps=total_steps, pct_start=pct_start, anneal_strategy='cos')
+    
+    elif opt.method in ["cclis", "supcon", "supcon-joint", "cclis-wo", "cclis-wo-ss", "cclis-wo-is"]:
+        print("len(dataloader): ", len(dataloader))
+        if opt.target_task == 0:
+            total_steps = opt.start_epoch * len(dataloader)
+            pct_start = (10 * len(dataloader)) / total_steps
+            scheduler = lr_scheduler.OneCycleLR(optimizer, max_lr=opt.learning_rate, total_steps=total_steps, pct_start=pct_start, anneal_strategy='cos')
+        else:
+            total_steps = opt.epochs * len(dataloader)
+            pct_start = (10 * len(dataloader)) / total_steps
+            scheduler = lr_scheduler.OneCycleLR(optimizer, max_lr=opt.learning_rate, total_steps=total_steps, pct_start=pct_start, anneal_strategy='cos')
+    
     elif opt.method == "lucir":
         scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[80, 120], gamma=0.1)
+    
     elif opt.method in ["fs-dgpm"]:
         total_steps = epochs * len(dataloader)
         if opt.target_task == 0:
