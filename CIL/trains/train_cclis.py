@@ -41,6 +41,19 @@ def adjust_learning_rate_cclis(args, optimizer, epoch):
 
 
 
+def warmup_learning_rate(args, epoch, batch_id, total_batches, optimizer):
+    if args.warm and epoch <= args.warm_epochs:
+        p = (batch_id + (epoch - 1) * total_batches) / \
+            (args.warm_epochs * total_batches)
+        lr_enc = args.warmup_from_enc + p * (args.warmup_to_enc - args.warmup_from_enc)
+        lr_prot = args.warmup_from_prot + p * (args.warmup_to_prot - args.warmup_from_prot)
+        lr_list = [lr_enc, lr_enc, lr_prot]
+
+        for idx, param_group in enumerate(optimizer.param_groups):
+            param_group['lr'] = lr_list[idx]
+
+
+
 
 def train_cclis(opt, model, model2, criterion, optimizer, scheduler, train_loader, epoch, subset_sample_num, score_mask):
 
@@ -66,6 +79,10 @@ def train_cclis(opt, model, model2, criterion, optimizer, scheduler, train_loade
             w = model.prototypes.weight.data.clone()
             w = nn.functional.normalize(w, dim=1, p=2)
             model.prototypes.weight.copy_(w)
+        
+
+        # warm-up learning rate
+        warmup_learning_rate(opt, epoch, idx, len(train_loader), optimizer)
         
         features, output = model(images)
 
@@ -166,11 +183,15 @@ def train_cclis(opt, model, model2, criterion, optimizer, scheduler, train_loade
         # 現在の学習率
         current_lr = optimizer.param_groups[0]['lr']
 
+        # for i, param_group in enumerate(optimizer.param_groups):
+        #         print(f"Param group {i} learning rate: {param_group['lr']}")
+        # print("scheduler.get_last_lr(): ", scheduler.get_last_lr())
+
         # SGD
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        scheduler.step()
+        # scheduler.step()
 
         # 学習記録の表示
         if (idx+1) % opt.print_freq == 0 or idx+1 == len(train_loader):
@@ -195,7 +216,7 @@ def val_cclis(opt, model, model2, linear_loader, val_loader, taskil_loaders, epo
     optimizer = optim.SGD(classifier.parameters(),
                           lr=opt.linear_lr,
                           momentum=opt.linear_momentum,
-                          weight_decay=opt.weight_decay)
+                          weight_decay=opt.linear_weight_decay)
 
     # schedulerの設定
     scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[60, 75, 90], gamma=0.2)

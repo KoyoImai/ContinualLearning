@@ -116,7 +116,7 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
 
     elif opt.method in ["cclis"]:
 
-        # adjust_learning_rate_cclis(opt, optimizer, epoch)
+        adjust_learning_rate_cclis(opt, optimizer, epoch)
 
         subset_sample_num = method_tools["subset_sample_num"]
         score_mask = method_tools["score_mask"]
@@ -125,7 +125,7 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
                                    criterion=criterion, optimizer=optimizer,
                                    subset_sample_num=subset_sample_num, score_mask=score_mask,
                                    scheduler=scheduler, train_loader=train_loader, epoch=epoch)
-        if epoch % 50 == 0:
+        if epoch % 100 == 0:
             classil_acc, taskil_acc, all_task_accuracies, all_task_losses = val_cclis(opt, model, model2, linear_loader, val_loader, taskil_loaders, epoch)
             # 各タスクの精度を「task0 acc=100.00, task1 acc=90.00」の形式で整形
             taskil_acc_str = ', '.join([f"task{i} acc={acc:.2f}" for i, acc in enumerate(all_task_accuracies)])

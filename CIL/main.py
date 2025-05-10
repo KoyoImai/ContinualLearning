@@ -60,6 +60,7 @@ def parse_option():
     parser.add_argument('--linear_epochs', type=int, default=100)
     parser.add_argument('--linear_lr', type=float, default=0.1)
     parser.add_argument('--linear_momentum', type=float, default=0.9)
+    parser.add_argument('--linear_weight_decay', type=float, default=0)
     parser.add_argument('--linear_batch_size', type=int, default=256)
 
     # 継続学習的設定
@@ -95,6 +96,8 @@ def parse_option():
     parser.add_argument('--cosine', default=False, action='store_true')
     parser.add_argument('--lr_decay_rate', type=float, default=0.1,
                         help='decay rate for learning rate')
+    # parser.add_argument('--warm', action='store_true',
+    #                     help='warm-up for large batch training')
 
     # 手法毎のハイパラ（fs-dgpm）
     # parser.add_argument('--inner_batches', type=int, default=2)
@@ -114,7 +117,7 @@ def parse_option():
 
 
     # その他の条件
-    parser.add_argument('--print_freq', type=int, default=20)
+    parser.add_argument('--print_freq', type=int, default=10)
     parser.add_argument('--num_workers', type=int, default=8)
     parser.add_argument('--seed', type=int, default=777)
     parser.add_argument('--date', type=str, default="2001_05_02")
@@ -308,6 +311,7 @@ def make_setup(opt):
         #                         momentum=opt.momentum,
         #                         weight_decay=opt.weight_decay)
 
+
         if 'prototypes.weight' in model.state_dict().keys():
             optimizer = optim.SGD([
                             {'params': model.encoder.parameters()},
@@ -423,7 +427,8 @@ def make_scheduler(opt, epochs, dataloader, method_tools):
             pct_start = (10 * len(dataloader)) / total_steps
             scheduler = lr_scheduler.OneCycleLR(optimizer, max_lr=opt.learning_rate, total_steps=total_steps, pct_start=pct_start, anneal_strategy='cos')
     
-    elif opt.method in ["cclis", "supcon", "supcon-joint", "cclis-wo", "cclis-wo-ss", "cclis-wo-is"]:
+    # elif opt.method in ["cclis", "supcon", "supcon-joint", "cclis-wo", "cclis-wo-ss", "cclis-wo-is"]:
+    elif opt.method in ["supcon", "supcon-joint", "cclis-wo", "cclis-wo-ss", "cclis-wo-is"]:
         print("len(dataloader): ", len(dataloader))
         if opt.target_task == 0:
             total_steps = opt.start_epoch * len(dataloader)
@@ -444,8 +449,8 @@ def make_scheduler(opt, epochs, dataloader, method_tools):
         else:
             scheduler = lr_scheduler.OneCycleLR(optimizer, max_lr=opt.learning_rate, total_steps=total_steps, pct_start=0.1, anneal_strategy='cos')
     
-    # elif opt.method in ["cclis"]:   # 別の方法でschedulerを実装
-    #     scheduler = None
+    elif opt.method in ["cclis"]:   # 別の方法でschedulerを実装
+        scheduler = None
     else:
         assert False
 
@@ -456,6 +461,9 @@ def main():
 
     # コマンドライン引数の処理
     opt = parse_option()
+
+    # print("opt.learning_rate: ", opt.learning_rate)
+    # assert False
 
     # 乱数のシード固定（既存のコードに追加）
     seed_everything(opt.seed)
