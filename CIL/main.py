@@ -1,4 +1,5 @@
 import os
+import copy
 import random
 import argparse
 import numpy as np
@@ -28,7 +29,7 @@ def parse_option():
     # 手法
     parser.add_argument('--method', type=str, default="",
                         choices=['er', 'co2l', 'gpm', 'lucir', 'fs-dgpm', 'cclis', 'supcon', 'supcon-joint', 'simclr',
-                                 'cclis-wo', 'cclis-wo-ss', 'cclis-wo-is'])
+                                 'cclis-v2','cclis-wo', 'cclis-wo-ss', 'cclis-wo-is'])
 
     # logの名前（実行毎に変えてね）
     parser.add_argument('--log_name', type=str, default="practice")
@@ -396,6 +397,17 @@ def make_setup(opt):
                                 weight_decay=opt.weight_decay)
         method_tools = {"optimizer": optimizer}
 
+    elif opt.method in ["cclis-v2"]:
+
+        if opt.dataset in ["cifar10", "cifar100", "tiny-imagenet"]:
+            from models.resnet_cifar_cclisv2 import SupConResNet
+        elif opt.dataset in ["imagemet"]:
+            assert False
+
+        model = SupConResNet(name=opt.model, opt=opt)
+
+
+        assert False
     else:
         assert False
 
@@ -494,6 +506,9 @@ def main():
         opt.target_task = target_task
         print('Start Training current task {}'.format(opt.target_task))
         logging.info('Start Training current task {}'.format(opt.target_task))
+
+        # 教師モデル（model2）のパラメータを生徒モデルのパラメータでコピー
+        model2 = copy.deepcopy(model)
 
         # リプレイバッファ内にあるデータのインデックスを獲得
         replay_indices, method_tools = set_buffer(opt, model, prev_indices=replay_indices, method_tools=method_tools)
