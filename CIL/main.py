@@ -150,7 +150,7 @@ def preparation(opt):
         opt.size = 32
     if opt.dataset == 'cifar100':
         opt.n_cls = 100
-        opt.cls_per_task = 10
+        opt.cls_per_task = 20
         opt.size = 32
     elif opt.dataset == 'tiny-imagenet':
         opt.n_cls = 200
@@ -559,7 +559,7 @@ def main():
         save_model(model, method_tools["optimizer"], opt, opt.epochs, file_path)
 
     
-    
+
 
 if __name__ == "__main__":
     main()
