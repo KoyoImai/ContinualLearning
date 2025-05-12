@@ -12,6 +12,7 @@ from trains.train_fsdgpm import train_fsdgpm, val_fsdgpm
 from trains.train_cclis import train_cclis, val_cclis, ncm_cclis, adjust_learning_rate_cclis
 from trains.train_cclis_wo import train_cclis_wo, val_cclis_wo, ncm_cclis_wo
 from trains.train_supcon import train_supcon
+from trains.train_cclis_bw import train_cclis_bw
 
 
 
@@ -172,7 +173,19 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
             logger.info(f"task {opt.target_task} Epoch {epoch}: train_loss={loss:.4f}, \
                         ClassIL_accuracy={classil_acc:.3f}, TaskIL_accuracy={taskil_acc:.3f}, NCM_accuracy={ncm_acc:.3f}, \
                         {taskil_acc_str}")
-        
+    
+    elif opt.method in ["cclis-bw"]:
+
+        adjust_learning_rate_cclis(opt, optimizer, epoch)
+
+        subset_sample_num = method_tools["subset_sample_num"]
+        score_mask = method_tools["score_mask"]
+        criterion_bw = method_tools["criterion_bw"]
+
+        loss, model2 = train_cclis_bw(opt=opt, model=model, model2=model2,
+                                      criterion=criterion, criterion_bw=criterion_bw, optimizer=optimizer,
+                                      subset_sample_num=subset_sample_num, score_mask=score_mask,
+                                      scheduler=scheduler, train_loader=train_loader, epoch=epoch)
 
     else:
         assert False

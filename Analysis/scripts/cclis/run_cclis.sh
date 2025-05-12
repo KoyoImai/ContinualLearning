@@ -40,13 +40,13 @@ export CUDA_VISIBLE_DEVICES="1"
 
 
 ## ここから分析ように実行したやつ
-python main_svd.py --method cclis --dataset cifar10 --block_type block --flatten_type flatten \
-                   --log_path /home/kouyou/ContinualLearning/survey/CIL/logs/cclis/cclis_cclis_ring2000_cifar10_seed0_date2025_04_20/mem_log \
-                   --model_path /home/kouyou/ContinualLearning/survey/CIL/logs/cclis/cclis_cclis_ring2000_cifar10_seed0_date2025_04_20/model
+python main_svd.py --method cclis --dataset cifar10 --block_type block --flatten_type avgpool \
+                   --log_path /home/kouyou/ContinualLearning/survey/CIL/logs/cclis/cclis_cclis_ring2000_cifar10_seed1_date2025_05_11/mem_log \
+                   --model_path /home/kouyou/ContinualLearning/survey/CIL/logs/cclis/cclis_cclis_ring2000_cifar10_seed1_date2025_05_11/model
 
-python main_svd.py --method cclis --dataset cifar10 --block_type conv --flatten_type flatten \
-                   --log_path /home/kouyou/ContinualLearning/survey/CIL/logs/cclis/cclis_cclis_ring2000_cifar10_seed0_date2025_04_20/mem_log \
-                   --model_path /home/kouyou/ContinualLearning/survey/CIL/logs/cclis/cclis_cclis_ring2000_cifar10_seed0_date2025_04_20/model
+# python main_svd.py --method cclis --dataset cifar10 --block_type conv --flatten_type flatten \
+#                    --log_path /home/kouyou/ContinualLearning/survey/CIL/logs/cclis/cclis_cclis_ring2000_cifar10_seed0_date2025_04_20/mem_log \
+#                    --model_path /home/kouyou/ContinualLearning/survey/CIL/logs/cclis/cclis_cclis_ring2000_cifar10_seed0_date2025_04_20/model
 
 # python main_svd.py --method cclis --dataset cifar10 --projector\
 #                    --log_path /home/kouyou/ContinualLearning/survey/CIL/logs/cclis/cclis_cclis_ring2000_cifar10_seed0_date2025_04_20/mem_log \

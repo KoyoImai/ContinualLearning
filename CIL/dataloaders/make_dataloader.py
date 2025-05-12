@@ -42,7 +42,8 @@ from dataloaders.dataloader_joint import set_loader_joint_cifar10, set_valloader
 from dataloaders.dataloader_joint import set_loader_joint_cifar100, set_valloader_joint_cifar100, set_linearloader_joint_cifar100
 from dataloaders.dataloader_joint import set_loader_joint_tinyimagenet, set_valloader_joint_tinyimagenet, set_linearloader_joint_tinyimagenet
 
-
+# cclis-bw
+from dataloaders.dataloader_cclis_bw import set_loader_cclis_bw_cifar10, set_loader_cclis_bw_cifar100, set_loader_cclis_bw_tinyimagenet
 
 
 
@@ -204,6 +205,27 @@ def set_loader(opt, replay_indices, method_tools):
             linear_loader = set_linearloader_co2l_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices)
         elif opt.dataset == 'tiny-imagenet':
             train_loader, subset_indices, subset_sample_num = set_loader_cclis_wo_ss_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices, method_tools=method_tools)
+            post_loader, _, _ = set_loader_cclis_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices, method_tools=method_tools, training=False)
+            val_loader = set_valloader_co2l_tinyimagenet(opt=opt, normalize=normalize)
+            linear_loader = set_linearloader_co2l_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices)
+        
+        method_tools["subset_sample_num"] = subset_sample_num
+        method_tools["post_loader"] = post_loader
+    
+    elif opt.method in ["cclis-bw"]:
+
+        if opt.dataset == "cifar10":
+            train_loader, subset_indices, subset_sample_num = set_loader_cclis_bw_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices, method_tools=method_tools)
+            post_loader, _, _ = set_loader_cclis_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices, method_tools=method_tools, training=False)
+            val_loader = set_valloader_co2l_cifar10(opt=opt, normalize=normalize)
+            linear_loader = set_linearloader_co2l_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices)
+        elif opt.dataset == "cifar100":
+            train_loader, subset_indices, subset_sample_num = set_loader_cclis_bw_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices, method_tools=method_tools)
+            post_loader, _, _ = set_loader_cclis_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices, method_tools=method_tools, training=False)
+            val_loader = set_valloader_co2l_cifar100(opt=opt, normalize=normalize)
+            linear_loader = set_linearloader_co2l_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices)
+        elif opt.dataset == 'tiny-imagenet':
+            train_loader, subset_indices, subset_sample_num = set_loader_cclis_bw_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices, method_tools=method_tools)
             post_loader, _, _ = set_loader_cclis_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices, method_tools=method_tools, training=False)
             val_loader = set_valloader_co2l_tinyimagenet(opt=opt, normalize=normalize)
             linear_loader = set_linearloader_co2l_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices)

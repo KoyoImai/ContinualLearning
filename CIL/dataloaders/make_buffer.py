@@ -56,7 +56,7 @@ def set_buffer(opt, model, prev_indices=None, method_tools=None):
         replay_indices = []
 
 
-    elif opt.method in ["cclis", "cclis-wo"]:
+    elif opt.method in ["cclis", "cclis-wo", "cclis-bw"]:
 
         from dataloaders.buffer_cclis import set_replay_samples_cclis
         

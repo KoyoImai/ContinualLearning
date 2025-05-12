@@ -196,14 +196,14 @@ def main():
         print()
 
         # SVDによる分析（タスク，クラス毎に特徴ベクトルを分割）
-        # results = svd(opt=opt, features=features, labels=labels, cls_per_task=opt.cls_per_task, name="alldata")  # タスク毎にSVD
-        # results = svd(opt=opt, features=features, labels=labels, name="alldata")                                 # クラス毎にSVD
+        results = svd(opt=opt, features=features, labels=labels, cls_per_task=opt.cls_per_task, name="alldata")  # タスク毎にSVD
+        results = svd(opt=opt, features=features, labels=labels, name="alldata")                                 # クラス毎にSVD
 
         # SVDによる分析（すべての特徴ベクトルを一度にSVD）
-        # results = svd(opt=opt, features=features, labels=labels, name="alldata", mode="all")  # タスク毎にSVD
+        results = svd(opt=opt, features=features, labels=labels, name="alldata", mode="all")  # タスク毎にSVD
 
         # 各層の出力毎にSVD
-        results = svd_all_layers(opt=opt, layer_outputs=layer_outputs, labels=labels, name="alldata", mode="cls")
+        # results = svd_all_layers(opt=opt, layer_outputs=layer_outputs, labels=labels, name="alldata", mode="cls")
 
 
 
@@ -213,8 +213,8 @@ def main():
         print("2 labels.shape: ", labels.shape)
         
         # SVDによる分析
-        # results = svd(opt=opt, features=features, labels=labels, cls_per_task=opt.cls_per_task, name="replay")  # タスク毎にSVD
-        # results = svd(opt=opt, features=features, labels=labels, name="replay")                                 # クラス毎にSVD
+        results = svd(opt=opt, features=features, labels=labels, cls_per_task=opt.cls_per_task, name="replay")  # タスク毎にSVD
+        results = svd(opt=opt, features=features, labels=labels, name="replay")                                 # クラス毎にSVD
 
 
 

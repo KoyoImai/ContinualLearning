@@ -29,7 +29,7 @@ def parse_option():
     # 手法
     parser.add_argument('--method', type=str, default="",
                         choices=['er', 'co2l', 'gpm', 'lucir', 'fs-dgpm', 'cclis', 'supcon', 'supcon-joint', 'simclr',
-                                 'cclis-v2','cclis-wo', 'cclis-wo-ss', 'cclis-wo-is'])
+                                 'cclis-bw','cclis-wo', 'cclis-wo-ss', 'cclis-wo-is'])
 
     # logの名前（実行毎に変えてね）
     parser.add_argument('--log_name', type=str, default="practice")
@@ -116,6 +116,8 @@ def parse_option():
     parser.add_argument('--lam_init', type=float, default=1.0, help='temperature for sigmoid')
     parser.add_argument('--tmp', type=float, default=10, help='temperature for sigmoid')
 
+    parser.add_argument('--bw_lambd', default=0.0050, type=float, metavar='L',
+                        help='weight on off-diagonal terms')
 
     # その他の条件
     parser.add_argument('--print_freq', type=int, default=10)
@@ -397,17 +399,42 @@ def make_setup(opt):
                                 weight_decay=opt.weight_decay)
         method_tools = {"optimizer": optimizer}
 
-    elif opt.method in ["cclis-v2"]:
+    # CCLIS + Barlow Twins
+    elif opt.method in ["cclis-bw"]:
+
+        from losses.loss_cclisbw import ISSupConLoss, BarlowTwinsLoss
 
         if opt.dataset in ["cifar10", "cifar100", "tiny-imagenet"]:
-            from models.resnet_cifar_cclisv2 import SupConResNet
+            from models.resnet_cifar_cclis import SupConResNet
         elif opt.dataset in ["imagemet"]:
             assert False
 
-        model = SupConResNet(name=opt.model, opt=opt)
+        model = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed, opt=opt)
+        model2 = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed, opt=opt)
+        criterion = ISSupConLoss(temperature=opt.temp, opt=opt)
+        criterion_bw = BarlowTwinsLoss(opt=opt, size=128)
+        if torch.cuda.is_available():
+            criterion_bw = criterion_bw.cuda()
 
+        if 'prototypes.weight' in model.state_dict().keys():
+            optimizer = optim.SGD([
+                            {'params': model.encoder.parameters()},
+                            {'params': model.head.parameters()},
+                            {'params': model.prototypes.parameters(), 'lr': opt.learning_rate_prototypes},
+                            ],
+                            lr=opt.learning_rate,
+                            momentum=opt.momentum,
+                            weight_decay=opt.weight_decay)
+        else:
+            learning_rate =  opt.learning_rate
+            optimizer = optim.SGD(model.parameters(),
+                            lr=learning_rate,
+                            momentum=opt.momentum,
+                            weight_decay=opt.weight_decay)
+        
+        method_tools = {"optimizer": optimizer, "importance_weight": None, "score": None, "criterion_bw": criterion_bw,
+                        "score_mask": None, "subset_sample_num": None, "post_loader": None, "val_targets": None}
 
-        assert False
     else:
         assert False
 
@@ -461,7 +488,7 @@ def make_scheduler(opt, epochs, dataloader, method_tools):
         else:
             scheduler = lr_scheduler.OneCycleLR(optimizer, max_lr=opt.learning_rate, total_steps=total_steps, pct_start=0.1, anneal_strategy='cos')
     
-    elif opt.method in ["cclis"]:   # 別の方法でschedulerを実装
+    elif opt.method in ["cclis", "cclis-bw"]:   # 別の方法でschedulerを実装
         scheduler = None
     else:
         assert False
