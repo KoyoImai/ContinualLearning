@@ -126,8 +126,7 @@ def parse_option():
     parser.add_argument('--date', type=str, default="2001_05_02")
     parser.add_argument('--earlystop', default=False, action='store_true', help='')
 
-
-    opt = parser.parse_args()
+    opt = parser.parse_args('--offline', default=False, action='store_true')
 
     return opt
 
@@ -148,15 +147,24 @@ def preparation(opt):
     # データセット毎にタスク数・タスク毎のクラス数を決定
     if opt.dataset == 'cifar10':
         opt.n_cls = 10
-        opt.cls_per_task = 2
+        if opt.offline:
+            opt.cls_per_task = 10
+        else:
+            opt.cls_per_task = 2
         opt.size = 32
     if opt.dataset == 'cifar100':
         opt.n_cls = 100
-        opt.cls_per_task = 20
+        if opt.offline:
+            opt.cls_per_task = 100
+        else:
+            opt.cls_per_task = 10
         opt.size = 32
     elif opt.dataset == 'tiny-imagenet':
         opt.n_cls = 200
-        opt.cls_per_task = 20
+        if opt.offline:
+            opt.cls_per_task = 200
+        else:
+            opt.cls_per_task = 20
         opt.size = 64
     else:
         pass
@@ -364,7 +372,6 @@ def make_setup(opt):
         method_tools = {"optimizer": optimizer, "importance_weight": None, "score": None,
                         "score_mask": None, "subset_sample_num": None, "post_loader": None, "val_targets": None}
 
-    
     elif opt.method in ["supcon", "supcon-joint"]:
 
         from losses.loss_supcon import SupConLoss

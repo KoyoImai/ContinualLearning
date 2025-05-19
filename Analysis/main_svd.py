@@ -43,7 +43,7 @@ def parse_option():
     # データセット毎にタスク数・タスク毎のクラス数を決定
     if opt.dataset == 'cifar10':
         opt.n_cls = 10
-        opt.cls_per_task = 2
+        opt.cls_per_task = 10
         opt.size = 32
     if opt.dataset == 'cifar100':
         opt.n_cls = 100
