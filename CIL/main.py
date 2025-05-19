@@ -126,7 +126,9 @@ def parse_option():
     parser.add_argument('--date', type=str, default="2001_05_02")
     parser.add_argument('--earlystop', default=False, action='store_true', help='')
 
-    opt = parser.parse_args('--offline', default=False, action='store_true')
+    parser.add_argument('--offline', default=False, action='store_true')
+
+    opt = parser.parse_args()
 
     return opt
 
@@ -399,7 +401,7 @@ def make_setup(opt):
         
         model = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed)
         model2 = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed)
-        criterion = SupConLoss(temperature=opt.temp)
+        criterion = ContrastiveLoss(temperature=opt.temp)
         optimizer = optim.SGD(model.parameters(),
                                 lr=opt.learning_rate,
                                 momentum=opt.momentum,
@@ -462,7 +464,7 @@ def make_scheduler(opt, epochs, dataloader, method_tools):
     if opt.method in ["er", "gpm"]:
         scheduler = None
     
-    elif opt.method in ["co2l"]:
+    elif opt.method in ["co2l", "simclr"]:
         print("len(dataloader): ", len(dataloader))
         if opt.target_task == 0:
             total_steps = opt.start_epoch * len(dataloader)

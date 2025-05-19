@@ -47,7 +47,7 @@ def extract_features_cclis(opt, model, data_loader):
 
             # 各層のhook出力（平均プーリングしてflatten）
             for name, feat in hooker.outputs.items():
-                print("feat.shape: ", feat.shape)
+                # print("feat.shape: ", feat.shape)
                 if feat_mode == "avgpool":
                     feat = torch.nn.functional.adaptive_avg_pool2d(feat, (1, 1)).squeeze()
                 elif feat_mode == "flatten":
@@ -57,7 +57,7 @@ def extract_features_cclis(opt, model, data_loader):
                 else:
                     raise ValueError(f"Unknown feature_reduce_mode: {feat_mode}")
                 
-                print("feat.shape: ", feat.shape)
+                # print("feat.shape: ", feat.shape)
 
                 layerwise_features[name].append(feat)
 

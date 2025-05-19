@@ -88,7 +88,7 @@ def set_loader(opt, replay_indices, method_tools):
         else:
             assert False
     
-    elif opt.method in ["co2l", "supcon"]:
+    elif opt.method in ["co2l", "supcon", "simclr"]:
         if opt.dataset == "cifar10":
             train_loader, subset_indices = set_loader_co2l_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices)
             val_loader = set_valloader_co2l_cifar10(opt=opt, normalize=normalize)

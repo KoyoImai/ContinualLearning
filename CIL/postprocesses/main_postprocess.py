@@ -16,7 +16,7 @@ def post_process(opt, model, model2, dataloader, criterion, method_tools, replay
     vanilla_loader = dataloader["vanilla"]
 
 
-    if opt.method in ["er", "co2l", "lucir", "supcon", "supcon-joint"]:
+    if opt.method in ["er", "co2l", "lucir", "supcon", "supcon-joint", "simclr"]:
         return method_tools, model2
     elif opt.method == "gpm":
 

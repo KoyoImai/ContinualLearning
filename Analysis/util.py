@@ -87,3 +87,31 @@ def write_csv(value, path, file_name, epoch):
         else:
             row = [epoch, value]
         writer.writerow(row)
+
+
+
+# csvファイルに値を書き込む
+def write_csv_analysis(value, path, file_name, task_model, task_data,):
+    # ファイルパスを生成
+    file_path = f"{path}/{file_name}.csv"
+
+    # ファイルが存在しなければ新規作成、かつヘッダー行を記入する
+    # value がリストの場合は、ヘッダーの値部分は要素数に合わせて "value_1", "value_2", ... とする例
+    if not os.path.isfile(file_path):
+        with open(file_path, 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            # ヘッダー行を定義（必要に応じて適宜変更）
+            if isinstance(value, list):
+                header = ["task_model"] + ["task_data"] + [f"value_{i+1}" for i in range(len(value))]
+            else:
+                header = ["task_model", "task_data", "value"]
+            writer.writerow(header)
+
+    # CSV に実際のデータを追加記録する
+    with open(file_path, 'a', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        if isinstance(value, list):
+            row = [task_model] + [task_data] + value
+        else:
+            row = [task_model, task_data, value]
+        writer.writerow(row)

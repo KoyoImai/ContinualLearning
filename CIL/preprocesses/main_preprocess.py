@@ -8,7 +8,7 @@ from preprocesses.preprocess_cclis import preprocess_cclis
 
 def pre_process(opt, model, model2,  dataloader, method_tools):
 
-    if opt.method in ["er", "co2l", "supcon", "supcon-joint"]:
+    if opt.method in ["er", "co2l", "supcon", "supcon-joint", "simclr"]:
         return method_tools, model, model2
     elif opt.method == "gpm":
         method_tools = preprocess_gpm(opt=opt, method_tools=method_tools)

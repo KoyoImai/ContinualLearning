@@ -16,7 +16,7 @@ def set_buffer(opt, model, prev_indices=None, method_tools=None):
             assert False
 
 
-    elif opt.method == "co2l":
+    elif opt.method in ["co2l", "simclr"]:
 
         if opt.mem_type == "ring":
             from dataloaders.buffer_er import set_replay_samples_ring
