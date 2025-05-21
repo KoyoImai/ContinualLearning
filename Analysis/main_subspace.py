@@ -27,9 +27,16 @@ def parse_option():
     # Projectorの使用
     parser.add_argument("--projector", default=False, action='store_true')
 
+    # 各層の出力を分析対象にするかどうかの指定など
+    parser.add_argument('--block_type', type=str, default="block",
+                        choices=["block", "basicblock", "conv"])
+    parser.add_argument('--flatten_type', type=str, default="flatten",
+                        choices=["flatten", "avgpool"])
+
     # その他
     parser.add_argument("--seed", type=int, default=777)
     parser.add_argument("--num_workers", type=int, default=8)
+    parser.add_argument("--use_dp", default=False, action='store_true')
 
     opt = parser.parse_args()
 
@@ -168,7 +175,7 @@ def main():
 
 
         # 特徴量を抽出（これまでのタスクに含まれるすべてのサンプル）
-        features, labels = extract_features(opt=opt, model=model, data_loader=data_loaders["train"])
+        features, labels, _ = extract_features(opt=opt, model=model, data_loader=data_loaders["train"])
         print("1 features.shape: ", features.shape)  # 1 features.shape:  torch.Size([10000, 512])
         print("1 labels.shape: ", labels.shape)      # 1 labels.shape:  torch.Size([10000])
         
@@ -185,7 +192,7 @@ def main():
         svd_all[target_task] = results
 
         # 特徴量を抽出（現在のタスクに含まれるサンプルとリプレイサンプル）
-        features, labels = extract_features(opt=opt, model=model, data_loader=data_loaders["trainv2"])
+        features, labels, _ = extract_features(opt=opt, model=model, data_loader=data_loaders["trainv2"])
         print("2 features.shape: ", features.shape)   # 2 features.shape:  torch.Size([20000, 512])
         print("2 labels.shape: ", labels.shape)       # 2 labels.shape:  torch.Size([20000])
         
