@@ -32,6 +32,7 @@ def parse_option():
                         choices=["block", "basicblock", "conv"])
     parser.add_argument('--flatten_type', type=str, default="flatten",
                         choices=["flatten", "avgpool"])
+    parser.add_argument('--rank', type=int, default=None)
 
     # その他
     parser.add_argument("--seed", type=int, default=777)
@@ -226,7 +227,7 @@ def main():
         svd_dict1 = svd_all_task_wise[t]
         svd_dict2 = svd_all_task_wise[t+1]
 
-        results = subspace_similarity(svd_dict1, svd_dict2, threshold)
+        results = subspace_similarity(svd_dict1, svd_dict2, threshold, opt)
         dist_atw[t] = results
 
 
@@ -249,7 +250,10 @@ def main():
     
     # 可視化
     print("dist_atw: ", dist_atw)
-    plot_diff_dist(dist_atw, opt=opt, name="dist_atw")
+    if opt.rank is None:
+        plot_diff_dist(dist_atw, opt=opt, name="dist_atw")
+    else:
+        plot_diff_dist(dist_atw, opt=opt, name=f"dist_atw_rank{opt.rank}")
 
     
     # task0のデータの特徴表現のsub spaceと他タスクのデータの特徴表現のsub space
@@ -267,14 +271,16 @@ def main():
         svd1 = svd_dict1[0]
         svd_dict2 = svd_all_task_wise[t]
 
-        results = subspace_similarity_diff_task(svd1, svd_dict2, threshold)
+        results = subspace_similarity_diff_task(svd1, svd_dict2, threshold, opt=opt)
         diff_dist_atw[t] = results
     
 
     # 可視化
     print("diff_dist_atw: ", diff_dist_atw)
-    plot_diff_dist(diff_dist_atw, opt=opt, name="diff_dist_atw")
-
+    if opt.rank is None:
+        plot_diff_dist(diff_dist_atw, opt=opt, name="diff_dist_atw")
+    else:
+        plot_diff_dist(dist_atw, opt=opt, name=f"dist_atw_rank{opt.rank}")
 
         
 

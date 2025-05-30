@@ -137,6 +137,30 @@ def svd(opt, features, labels, plot=True, max_k=20, cls_per_task=1, name="practi
             plt.plot(range(1, k+1), alpha_k[:k].cpu().numpy(), label=f'{cls_or_task} {t} (k={k_dim})')
         
 
+        # # === 新機能：正規化済みの非ゼロ特異値の累積和プロット ===
+        # nonzero_singular_values = S[S > 0]
+        # cumulative_sum = torch.cumsum(nonzero_singular_values, dim=0)
+        # normalized_cumsum = (cumulative_sum / cumulative_sum[-1]).cpu().numpy()
+
+        # plt.figure()
+        # plt.plot(range(1, len(normalized_cumsum) + 1), normalized_cumsum, label=f'Normalized cumulative sum of S')
+        # plt.xlabel('Index of singular value')
+        # plt.ylabel('Normalized cumulative sum')
+        # plt.title(f'Normalized Non-zero Singular Value Accumulation ({cls_or_task} {t})')
+        # plt.grid(True)
+        # plt.legend()
+        # plt.tight_layout()
+
+        # if opt.save_path:
+        #     save_dir = f"{opt.save_path}/{name}_{mode}_projector/cumsum/" if opt.projector else f"{opt.save_path}/{name}/cumsum/"
+        #     os.makedirs(save_dir, exist_ok=True)
+        #     file_path = f"{save_dir}/model{opt.target_task}_{cls_or_task}_{t}_cumsum.pdf"
+        #     plt.savefig(file_path)
+
+        # plt.show() if plot else plt.clf()
+        # # ====================================================
+        
+
         del z, z_centered, cov, U, S, V
         torch.cuda.empty_cache()  # 明示的にメモリを開放
 

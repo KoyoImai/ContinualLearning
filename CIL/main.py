@@ -29,7 +29,7 @@ def parse_option():
     # 手法
     parser.add_argument('--method', type=str, default="",
                         choices=['er', 'co2l', 'gpm', 'lucir', 'fs-dgpm', 'cclis', 'supcon', 'supcon-joint', 'simclr',
-                                 'cclis-bw','cclis-wo', 'cclis-wo-ss', 'cclis-wo-is'])
+                                 'cclis-bw','cclis-wo', 'cclis-wo-ss', 'cclis-wo-is', 'cclis-rfr'])
 
     # logの名前（実行毎に変えてね）
     parser.add_argument('--log_name', type=str, default="practice")
@@ -118,6 +118,10 @@ def parse_option():
 
     parser.add_argument('--bw_lambd', default=0.0050, type=float, metavar='L',
                         help='weight on off-diagonal terms')
+
+    # 手法ごとのハイパラ（cclis + α）
+    parser.add_argument('--rfr_power', type=float, default=0.1)
+
 
     # その他の条件
     parser.add_argument('--print_freq', type=int, default=10)
@@ -444,6 +448,45 @@ def make_setup(opt):
         method_tools = {"optimizer": optimizer, "importance_weight": None, "score": None, "criterion_bw": criterion_bw,
                         "score_mask": None, "subset_sample_num": None, "post_loader": None, "val_targets": None}
 
+    # CCLIS + RFR
+    elif opt.method in ["cclis-rfr"]:
+
+        from losses.loss_cclis import ISSupConLoss
+
+        if opt.dataset in ["cifar10", "cifar100", "tiny-imagenet"]:
+            from models.resnet_cifar_cclis import SupConResNet
+        elif opt.dataset in ["imagemet"]:
+            assert False
+        
+        model = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed, opt=opt)
+        model2 = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed, opt=opt)
+        criterion = ISSupConLoss(temperature=opt.temp, opt=opt)
+        criterion_rfr = None
+
+        # optimizer = optim.SGD(model.parameters(),
+        #                         lr=opt.learning_rate,
+        #                         momentum=opt.momentum,
+        #                         weight_decay=opt.weight_decay)
+
+
+        if 'prototypes.weight' in model.state_dict().keys():
+            optimizer = optim.SGD([
+                            {'params': model.encoder.parameters()},
+                            {'params': model.head.parameters()},
+                            {'params': model.prototypes.parameters(), 'lr': opt.learning_rate_prototypes},
+                            ],
+                            lr=opt.learning_rate,
+                            momentum=opt.momentum,
+                            weight_decay=opt.weight_decay)
+        else:
+            learning_rate =  opt.learning_rate
+            optimizer = optim.SGD(model.parameters(),
+                            lr=learning_rate,
+                            momentum=opt.momentum,
+                            weight_decay=opt.weight_decay)
+        method_tools = {"optimizer": optimizer, "importance_weight": None, "score": None,
+                        "score_mask": None, "subset_sample_num": None, "post_loader": None, "val_targets": None}
+        
     else:
         assert False
 
@@ -461,7 +504,7 @@ def make_scheduler(opt, epochs, dataloader, method_tools):
 
     optimizer = method_tools["optimizer"]
 
-    if opt.method in ["er", "gpm"]:
+    if opt.method in ["gpm"]:
         scheduler = None
     
     elif opt.method in ["co2l", "simclr"]:
@@ -476,7 +519,7 @@ def make_scheduler(opt, epochs, dataloader, method_tools):
             scheduler = lr_scheduler.OneCycleLR(optimizer, max_lr=opt.learning_rate, total_steps=total_steps, pct_start=pct_start, anneal_strategy='cos')
     
     # elif opt.method in ["cclis", "supcon", "supcon-joint", "cclis-wo", "cclis-wo-ss", "cclis-wo-is"]:
-    elif opt.method in ["supcon", "supcon-joint", "cclis-wo", "cclis-wo-ss", "cclis-wo-is"]:
+    elif opt.method in ["supcon", "supcon-joint", "cclis-wo-ss", "cclis-wo-is", "er"]:
         print("len(dataloader): ", len(dataloader))
         if opt.target_task == 0:
             total_steps = opt.start_epoch * len(dataloader)
@@ -497,7 +540,7 @@ def make_scheduler(opt, epochs, dataloader, method_tools):
         else:
             scheduler = lr_scheduler.OneCycleLR(optimizer, max_lr=opt.learning_rate, total_steps=total_steps, pct_start=0.1, anneal_strategy='cos')
     
-    elif opt.method in ["cclis", "cclis-bw"]:   # 別の方法でschedulerを実装
+    elif opt.method in ["cclis", "cclis-bw", "cclis-wo", "cclis-rfr"]:   # 別の方法でschedulerを実装
         scheduler = None
     else:
         assert False
@@ -593,6 +636,9 @@ def main():
         # 保存（opt.model_path）
         file_path = f"{opt.model_path}/model_{opt.target_task:02d}.pth"
         save_model(model, method_tools["optimizer"], opt, opt.epochs, file_path)
+
+        # print("method_tools['score_mask']: ", method_tools["score_mask"])
+        # assert False
 
     
 

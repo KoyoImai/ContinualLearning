@@ -105,7 +105,7 @@ def svd(opt, features, labels, plot=True, max_k=20, cls_per_task=1, name="practi
     
 
 # 同一タスク・クラスのデータに対する特徴表現のsub space類似度を計算
-def subspace_similarity(svd_dict1, svd_dict2, threshold):
+def subspace_similarity(svd_dict1, svd_dict2, threshold, opt):
 
     common_keys = set(svd_dict1.keys()) & set(svd_dict2.keys())
     print("common_keys: ",common_keys)
@@ -134,7 +134,10 @@ def subspace_similarity(svd_dict1, svd_dict2, threshold):
         k_dim2 = int((alpha_k2 > threshold).nonzero(as_tuple=True)[0][0].item()) + 1
 
         # 最大となる累積寄与率 α を選択
-        k = max(k_dim1, k_dim2)
+        if opt.rank is None:
+            k = max(k_dim1, k_dim2)
+        else:
+            k = opt.rank
         # print("k: ", k)  # k:  228
 
         # 上位特異値に対応するベクトルのみ取り出す
@@ -191,7 +194,10 @@ def subspace_similarity_diff_task(svd1, svd_dict2, threshold, name="practice", o
 
         # 最大となる累積寄与率 α を選択
         # k = max(k_dim1, k_dim2)
-        k = k_dim1
+        if opt.rank is None:
+            k = k_dim1
+        else:
+            k = opt.rank
         print("k: ", k)  # k:  228
 
         # 上位特異値に対応するベクトルのみ取り出す

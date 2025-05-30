@@ -37,7 +37,7 @@ def post_process(opt, model, model2, dataloader, criterion, method_tools, replay
     elif opt.method == "fs-dgpm":
         postprocess_fsdgpm(opt=opt, model=model)
 
-    elif opt.method in ["cclis", "cclis-bw", "cclis-wo", "cclis-wo-ss", "cclis-wo-is"]:
+    elif opt.method in ["cclis", "cclis-bw", "cclis-wo", "cclis-wo-ss", "cclis-wo-is", "cclis-rfr"]:
 
         method_tools = postprocess_cclis(opt, model, model2, method_tools, criterion, replay_indices)
 

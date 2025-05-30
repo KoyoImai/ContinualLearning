@@ -156,7 +156,7 @@ def set_loader(opt, replay_indices, method_tools):
         else:
             assert False
     
-    elif opt.method in ["cclis", "cclis-wo", "cclis-wo-is"]:
+    elif opt.method in ["cclis", "cclis-wo", "cclis-wo-is", "cclis-rfr"]:
 
         if opt.dataset == "cifar10":
             train_loader, subset_indices, subset_sample_num = set_loader_cclis_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices, method_tools=method_tools)

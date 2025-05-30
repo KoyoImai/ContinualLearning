@@ -90,6 +90,7 @@ def train_cclis(opt, model, model2, criterion, optimizer, scheduler, train_loade
                   if features.is_cuda
                   else torch.device('cpu'))
 
+        # 現在タスクのクラス
         target_labels = list(range(opt.target_task*opt.cls_per_task, (opt.target_task+1)*opt.cls_per_task))
 
         # ISSupCon

@@ -13,6 +13,7 @@ from trains.train_cclis import train_cclis, val_cclis, ncm_cclis, adjust_learnin
 from trains.train_cclis_wo import train_cclis_wo, val_cclis_wo, ncm_cclis_wo
 from trains.train_supcon import train_supcon
 from trains.train_cclis_bw import train_cclis_bw
+from trains.train_cclis_rfr import train_cclis_rfr
 from trains.train_simclr import train_simclr
 
 
@@ -157,6 +158,8 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
     
     elif opt.method in ["cclis-wo", "cclis-wo-ss", "cclis-wo-is"]:
 
+        adjust_learning_rate_cclis(opt, optimizer, epoch)
+
         subset_sample_num = method_tools["subset_sample_num"]
         score_mask = method_tools["score_mask"]
 
@@ -198,6 +201,31 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
             logger.info(f"task {opt.target_task} Epoch {epoch}: train_loss={loss:.4f}, \
                         ClassIL_accuracy={classil_acc:.3f}, TaskIL_accuracy={taskil_acc:.3f}, NCM_accuracy={ncm_acc:.3f}, \
                         {taskil_acc_str}")
+    
+    elif opt.method in ["cclis-rfr"]:
+
+        adjust_learning_rate_cclis(opt, optimizer, epoch)
+
+        subset_sample_num = method_tools["subset_sample_num"]
+        score_mask = method_tools["score_mask"]
+
+        loss, model2 = train_cclis_rfr(opt=opt, model=model, model2=model2,
+                                       criterion=criterion, optimizer=optimizer,
+                                       subset_sample_num=subset_sample_num, score_mask=score_mask,
+                                       scheduler=scheduler, train_loader=train_loader, epoch=epoch)
+        if epoch % 100 == 0:
+            classil_acc, taskil_acc, all_task_accuracies, all_task_losses = val_cclis(opt, model, model2, linear_loader, val_loader, taskil_loaders, epoch)
+            # 各タスクの精度を「task0 acc=100.00, task1 acc=90.00」の形式で整形
+            taskil_acc_str = ', '.join([f"task{i} acc={acc:.2f}" for i, acc in enumerate(all_task_accuracies)])
+
+            ncm_acc = ncm_cclis(model, ncm_loader, val_loader)
+
+            logger.info(f"task {opt.target_task} Epoch {epoch}: train_loss={loss:.4f}, \
+                        ClassIL_accuracy={classil_acc:.3f}, TaskIL_accuracy={taskil_acc:.3f}, NCM_accuracy={ncm_acc:.3f}, \
+                        {taskil_acc_str}")
+
+    
+    
     
     elif opt.method in ["simclr"]:
 

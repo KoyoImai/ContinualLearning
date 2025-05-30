@@ -127,6 +127,7 @@ def set_loader_cclis_cifar10(opt, normalize, replay_indices, method_tools, train
     target_classes = list(range(opt.target_task*opt.cls_per_task, (opt.target_task+1)*opt.cls_per_task))
     print('target_classes', target_classes)
 
+    # 
     subset_indices = []
     subset_importance_weight = []
 

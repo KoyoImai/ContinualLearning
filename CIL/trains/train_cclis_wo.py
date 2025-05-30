@@ -41,6 +41,18 @@ def adjust_learning_rate_cclis_wo(args, optimizer, epoch):
 
 
 
+def warmup_learning_rate(args, epoch, batch_id, total_batches, optimizer):
+    if args.warm and epoch <= args.warm_epochs:
+        p = (batch_id + (epoch - 1) * total_batches) / \
+            (args.warm_epochs * total_batches)
+        lr_enc = args.warmup_from_enc + p * (args.warmup_to_enc - args.warmup_from_enc)
+        lr_prot = args.warmup_from_prot + p * (args.warmup_to_prot - args.warmup_from_prot)
+        lr_list = [lr_enc, lr_enc, lr_prot]
+
+        for idx, param_group in enumerate(optimizer.param_groups):
+            param_group['lr'] = lr_list[idx]
+            
+
 
 def train_cclis_wo(opt, model, model2, criterion, optimizer, scheduler, train_loader, epoch, subset_sample_num, score_mask):
 
@@ -68,6 +80,9 @@ def train_cclis_wo(opt, model, model2, criterion, optimizer, scheduler, train_lo
             w = model.prototypes.weight.data.clone()
             w = nn.functional.normalize(w, dim=1, p=2)
             model.prototypes.weight.copy_(w)
+        
+        # warm-up learning rate
+        warmup_learning_rate(opt, epoch, idx, len(train_loader), optimizer)
         
         features, output = model(images)
 
@@ -179,7 +194,7 @@ def train_cclis_wo(opt, model, model2, criterion, optimizer, scheduler, train_lo
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        scheduler.step()
+        # scheduler.step()
 
 
         # 学習記録の表示

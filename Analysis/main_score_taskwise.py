@@ -218,13 +218,13 @@ def main():
             # スコアの計算
             sil_score = agent_score._sil_score(features=features.cpu().numpy(), labels=labels.cpu().numpy())
             cal_score = agent_score._cal_score(features=features.cpu().numpy(), labels=labels.cpu().numpy())
-            # tr_W, tr_B = agent_score._cal_disp(features=features.cpu().numpy(), labels=labels.cpu().numpy())
+            tr_W, tr_B = agent_score._cal_disp(features=features.cpu().numpy(), labels=labels.cpu().numpy())
 
 
             write_csv_analysis(value=sil_score, path=opt.save_path, file_name="sil_score", task_data=idx, task_model=opt.target_task)
             write_csv_analysis(value=cal_score, path=opt.save_path, file_name="cal_score", task_data=idx, task_model=opt.target_task)
-            # write_csv_analysis(value=tr_W, path=opt.save_path, file_name="trW_score", task_data=idx, task_model=opt.target_task)
-            # write_csv_analysis(value=tr_B, path=opt.save_path, file_name="trB_score", task_data=idx, task_model=opt.target_task)
+            write_csv_analysis(value=tr_W, path=opt.save_path, file_name="trW_score", task_data=idx, task_model=opt.target_task)
+            write_csv_analysis(value=tr_B, path=opt.save_path, file_name="trB_score", task_data=idx, task_model=opt.target_task)
 
 
 

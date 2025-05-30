@@ -70,9 +70,53 @@ export CUDA_VISIBLE_DEVICES="2"
 
 
 
+# python main_svd.py --method cclis --dataset cifar10 \
+#                    --log_path /home/kouyou/ContinualLearning/survey/CIL/logs/cclis/2025_0511/cclis_cclis_ring2000_cifar10_seed0_date2025_05_11/mem_log \
+#                    --model_path /home/kouyou/ContinualLearning/survey/CIL/logs/cclis/2025_0511/cclis_cclis_ring2000_cifar10_seed0_date2025_05_11/model
+
+
+# CCLIS-RFR
 python main_svd.py --method cclis --dataset cifar10 \
-                   --log_path /home/kouyou/ContinualLearning/survey/CIL/logs/cclis/2025_0511/cclis_cclis_ring2000_cifar10_seed0_date2025_05_11/mem_log \
-                   --model_path /home/kouyou/ContinualLearning/survey/CIL/logs/cclis/2025_0511/cclis_cclis_ring2000_cifar10_seed0_date2025_05_11/model
+                   --log_path /home/kouyou/ContinualLearning/survey/CIL/logs/cclis-rfr/2025_0522/cclis-rfr-01_cclis-rfr_ring2000_cifar10_seed0_date2025_05_22/mem_log \
+                   --model_path /home/kouyou/ContinualLearning/survey/CIL/logs/cclis-rfr/2025_0522/cclis-rfr-01_cclis-rfr_ring2000_cifar10_seed0_date2025_05_22/model
+
+python main_svd.py --method cclis --dataset cifar10 \
+                   --log_path /home/kouyou/ContinualLearning/survey/CIL/logs/cclis-rfr/2025_0522/cclis-rfr-02_cclis-rfr_ring2000_cifar10_seed0_date2025_05_22/mem_log \
+                   --model_path /home/kouyou/ContinualLearning/survey/CIL/logs/cclis-rfr/2025_0522/cclis-rfr-02_cclis-rfr_ring2000_cifar10_seed0_date2025_05_22/model
+
+python main_svd.py --method cclis --dataset cifar10 \
+                   --log_path /home/kouyou/ContinualLearning/survey/CIL/logs/cclis-rfr/2025_0522/cclis-rfr-03_cclis-rfr_ring2000_cifar10_seed0_date2025_05_22/mem_log \
+                   --model_path /home/kouyou/ContinualLearning/survey/CIL/logs/cclis-rfr/2025_0522/cclis-rfr-03_cclis-rfr_ring2000_cifar10_seed0_date2025_05_22/model
+
+python main_svd.py --method cclis --dataset cifar10 \
+                   --log_path /home/kouyou/ContinualLearning/survey/CIL/logs/cclis-rfr/2025_0522/cclis-rfr-04_cclis-rfr_ring2000_cifar10_seed0_date2025_05_22/mem_log \
+                   --model_path /home/kouyou/ContinualLearning/survey/CIL/logs/cclis-rfr/2025_0522/cclis-rfr-04_cclis-rfr_ring2000_cifar10_seed0_date2025_05_22/model
+
+python main_svd.py --method cclis --dataset cifar10 \
+                   --log_path /home/kouyou/ContinualLearning/survey/CIL/logs/cclis-rfr/2025_0522/cclis-rfr-05_cclis-rfr_ring2000_cifar10_seed0_date2025_05_22/mem_log \
+                   --model_path /home/kouyou/ContinualLearning/survey/CIL/logs/cclis-rfr/2025_0522/cclis-rfr-05_cclis-rfr_ring2000_cifar10_seed0_date2025_05_22/model
+
+python main_svd.py --method cclis --dataset cifar10 \
+                   --log_path /home/kouyou/ContinualLearning/survey/CIL/logs/cclis-rfr/2025_0522/cclis-rfr-06_cclis-rfr_ring2000_cifar10_seed0_date2025_05_22/mem_log \
+                   --model_path /home/kouyou/ContinualLearning/survey/CIL/logs/cclis-rfr/2025_0522/cclis-rfr-06_cclis-rfr_ring2000_cifar10_seed0_date2025_05_22/model
+
+python main_svd.py --method cclis --dataset cifar10 \
+                   --log_path /home/kouyou/ContinualLearning/survey/CIL/logs/cclis-rfr/2025_0522/cclis-rfr-07_cclis-rfr_ring2000_cifar10_seed0_date2025_05_22/mem_log \
+                   --model_path /home/kouyou/ContinualLearning/survey/CIL/logs/cclis-rfr/2025_0522/cclis-rfr-07_cclis-rfr_ring2000_cifar10_seed0_date2025_05_22/model
+
+python main_svd.py --method cclis --dataset cifar10 \
+                   --log_path /home/kouyou/ContinualLearning/survey/CIL/logs/cclis-rfr/2025_0522/cclis-rfr-08_cclis-rfr_ring2000_cifar10_seed0_date2025_05_22/mem_log \
+                   --model_path /home/kouyou/ContinualLearning/survey/CIL/logs/cclis-rfr/2025_0522/cclis-rfr-08_cclis-rfr_ring2000_cifar10_seed0_date2025_05_22/model
+
+python main_svd.py --method cclis --dataset cifar10 \
+                   --log_path /home/kouyou/ContinualLearning/survey/CIL/logs/cclis-rfr/2025_0522/cclis-rfr-09_cclis-rfr_ring2000_cifar10_seed0_date2025_05_22/mem_log \
+                   --model_path /home/kouyou/ContinualLearning/survey/CIL/logs/cclis-rfr/2025_0522/cclis-rfr-09_cclis-rfr_ring2000_cifar10_seed0_date2025_05_22/model
+
+python main_svd.py --method cclis --dataset cifar10 \
+                   --log_path /home/kouyou/ContinualLearning/survey/CIL/logs/cclis-rfr/2025_0522/cclis-rfr-1_cclis-rfr_ring2000_cifar10_seed0_date2025_05_22/mem_log \
+                   --model_path /home/kouyou/ContinualLearning/survey/CIL/logs/cclis-rfr/2025_0522/cclis-rfr-1_cclis-rfr_ring2000_cifar10_seed0_date2025_05_22/model
+
+
 
 
 
