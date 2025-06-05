@@ -201,8 +201,10 @@ class ISSupConLoss(nn.Module):
         # 重要度重みの値を補正する
         with torch.no_grad():
             _importance_weight = importance_weight * (mask * mask.sum(dim=1, keepdim=True)).sum(dim=0)
-        # print("importance_weight[0:3]: ", importance_weight[0:3])
-        # print("_importance_weight[0:3]: ", _importance_weight[0:3])
+        print("importance_weight.shape: ", importance_weight.shape)   # importance_weight.shape:  torch.Size([512])
+        print("importance_weight[0:3]: ", importance_weight[0:3])
+        print("_importance_weight[0:3]: ", _importance_weight[0:3])
+        # assert False
 
 
         # 現在タスクのデータを見極めるためのマスク

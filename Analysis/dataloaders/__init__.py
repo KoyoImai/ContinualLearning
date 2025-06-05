@@ -5,6 +5,7 @@ from torchvision import transforms, datasets
 
 from dataloaders.dataloader_cclis import set_loader_cclis_cifar10, set_loader_cclis_cifar10_v2, set_taskil_valloader_cclis_cifar10
 from dataloaders.dataloader_cclis import set_loader_cclis_cifar100, set_loader_cclis_cifar100_v2, set_taskil_valloader_cclis_cifar100
+from dataloaders.dataloader_cclis import set_loader_cclis_tinyimagenet, set_loader_cclis_tinyimagenet_v2, set_taskil_valloader_cclis_tinyimagenet
 
 
 
@@ -38,10 +39,13 @@ def set_loader(opt, replay_indices):
         elif opt.dataset == "cifar100":
             train_loader, val_laoder = set_loader_cclis_cifar100(opt=opt, normalize=normalize)  # これまでのタスクのサンプルを全て含むデータローダー
             train_loader_2, _ = set_loader_cclis_cifar100_v2(opt=opt, normalize=normalize,
-                                                            replay_indices=replay_indices)     # 現在タスクのデータとリプレイサンプルを含むデータローダー
+                                                            replay_indices=replay_indices)      # 現在タスクのデータとリプレイサンプルを含むデータローダー
             task_loaders = set_taskil_valloader_cclis_cifar100(opt=opt, normalize=normalize)    # タスク毎のデータローダー
         elif opt.dataset == "tiny-imagenet":
-            assert False
+            train_loader, val_laoder = set_loader_cclis_tinyimagenet(opt=opt, normalize=normalize)  # これまでのタスクのサンプルを全て含むデータローダー
+            train_loader_2, _ = set_loader_cclis_tinyimagenet_v2(opt=opt, normalize=normalize,
+                                                            replay_indices=replay_indices)          # 現在タスクのデータとリプレイサンプルを含むデータローダー
+            task_loaders = set_taskil_valloader_cclis_tinyimagenet(opt=opt, normalize=normalize)    # タスク毎のデータローダー
     else:
         assert False
     

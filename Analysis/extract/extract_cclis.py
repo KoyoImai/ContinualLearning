@@ -17,15 +17,15 @@ def extract_features_cclis(opt, model, data_loader):
     features_list = []
     labels_list = []
 
-    # Hookの設定
-    granularity = getattr(opt, "granularity", opt.block_type)  # ← optに属性があれば使う（なければ"block"）
-    hooker = register_resnet18_hooks(model, opt, granularity=granularity)
+    # # Hookの設定
+    # granularity = getattr(opt, "granularity", opt.block_type)  # ← optに属性があれば使う（なければ"block"）
+    # hooker = register_resnet18_hooks(model, opt, granularity=granularity)
 
-    # 特徴マップの整形方法
-    feat_mode = getattr(opt, "feature_reduce_mode", opt.flatten_type)  # デフォルト: avgpool
+    # # 特徴マップの整形方法
+    # feat_mode = getattr(opt, "feature_reduce_mode", opt.flatten_type)  # デフォルト: avgpool
 
-    # 各層の特徴を保存する辞書（名前ごとにリスト）
-    layerwise_features = defaultdict(list)
+    # # 各層の特徴を保存する辞書（名前ごとにリスト）
+    # layerwise_features = defaultdict(list)
 
     with torch.no_grad():
 
@@ -38,28 +38,32 @@ def extract_features_cclis(opt, model, data_loader):
             if torch.cuda.is_available():
                 images = images.cuda()
                 labels = labels.cuda()
+
+            # print("model: ", model)
+            # assert False
             
-            if opt.use_dp:
-                feature = model.module.encoder(images)
-            else:
-                feature = model.encoder(images)
+            # if opt.use_dp:
+            #     feature = model.module.encoder(images)
+            # else:
+            #     feature = model.encoder(images)
+            feature = model.encoder(images)
             # print("feature.shape: ", feature.shape)
 
-            # 各層のhook出力（平均プーリングしてflatten）
-            for name, feat in hooker.outputs.items():
-                # print("feat.shape: ", feat.shape)
-                if feat_mode == "avgpool":
-                    feat = torch.nn.functional.adaptive_avg_pool2d(feat, (1, 1)).squeeze()
-                elif feat_mode == "flatten":
-                    feat = torch.nn.functional.interpolate(feat, scale_factor=0.5,
-                                                           mode="bilinear", align_corners=False)
-                    feat = feat.view(feat.size(0), -1)  # [B, C×H×W]
-                else:
-                    raise ValueError(f"Unknown feature_reduce_mode: {feat_mode}")
+            # # 各層のhook出力（平均プーリングしてflatten）
+            # for name, feat in hooker.outputs.items():
+            #     # print("feat.shape: ", feat.shape)
+            #     if feat_mode == "avgpool":
+            #         feat = torch.nn.functional.adaptive_avg_pool2d(feat, (1, 1)).squeeze()
+            #     elif feat_mode == "flatten":
+            #         feat = torch.nn.functional.interpolate(feat, scale_factor=0.5,
+            #                                                mode="bilinear", align_corners=False)
+            #         feat = feat.view(feat.size(0), -1)  # [B, C×H×W]
+            #     else:
+            #         raise ValueError(f"Unknown feature_reduce_mode: {feat_mode}")
                 
-                # print("feat.shape: ", feat.shape)
+            #     # print("feat.shape: ", feat.shape)
 
-                layerwise_features[name].append(feat)
+            #     layerwise_features[name].append(feat)
 
 
             # listに保存
@@ -73,9 +77,10 @@ def extract_features_cclis(opt, model, data_loader):
     # print("features.sahpe: ", features.shape)
     # print("labels.shape: ", labels.shape)
 
-    layer_outputs = {name: torch.cat(feats, dim=0) for name, feats in layerwise_features.items()}
+    # layer_outputs = {name: torch.cat(feats, dim=0) for name, feats in layerwise_features.items()}
         
-    return features, labels, layer_outputs
+    # return features, labels, layer_outputs
+    return features, labels, None
 
 
 

@@ -24,6 +24,15 @@ def register_resnet18_hooks(model, opt, granularity="block"):
     hooker = FeatureHook()
 
     if granularity == "block":
+    #     if opt.use_dp:
+    #         hook_targets = {
+    #             "conv1": model.module.encoder.conv1,
+    #             "layer1": model.module.encoder.layer1,
+    #             "layer2": model.module.encoder.layer2,
+    #             "layer3": model.module.encoder.layer3,
+    #             "layer4": model.module.encoder.layer4,
+    #         }
+    #     else:
         hook_targets = {
             "conv1": model.encoder.conv1,
             "layer1": model.encoder.layer1,

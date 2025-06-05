@@ -142,7 +142,8 @@ def make_setup(opt):
         
         print(torch.cuda.device_count())
         if opt.use_dp:
-            model = torch.nn.DataParallel(model)
+            # model = torch.nn.DataParallel(model)
+            model.encoder = torch.nn.DataParallel(model.encoder)
 
         model = model.cuda()
 
@@ -155,6 +156,7 @@ def main():
 
     # コマンドライン引数の処理
     opt = parse_option()
+
 
     # modelの作成
     model = make_setup(opt=opt)
@@ -181,13 +183,29 @@ def main():
         state_dict = ckpt['model']
         # model.load_state_dict(state_dict)
 
-        if isinstance(model, torch.nn.DataParallel):
-            new_state_dict = {'module.' + k: v for k, v in state_dict.items()}
-            model.load_state_dict(new_state_dict)
+        if isinstance(model.encoder, torch.nn.DataParallel):
+            # ② キーごとに変換。たとえば "encoder.conv1.weight" → "encoder.module.conv1.weight"
+            new_dict = {}
+            for k, v in state_dict.items():
+                if k.startswith("encoder."):
+                    # "encoder." のあとに来る部分を取り出し、
+                    # 先頭に "encoder.module." を付与する
+                    suffix = k[len("encoder."):]              # 例: "conv1.weight"
+                    new_key = "encoder.module." + suffix       # → "encoder.module.conv1.weight"
+                else:
+                    # head.1.weight などは変えずにそのまま載せる
+                    new_key = k
+                new_dict[new_key] = v
+
+            model.load_state_dict(new_dict)
+
         else:
+            # model.encoder が DataParallel でなければ，
+            # 保存時と同じキー構造 ("encoder.conv1.weight" ...) のまま読み込む
             model.load_state_dict(state_dict)
 
-        # 場合によってはここをコメントアウト
+
+        # # 場合によってはここをコメントアウト
         # if opt.use_dp:
         #     model = torch.nn.DataParallel(model)
         #     print("model; ", model)
@@ -205,6 +223,9 @@ def main():
 
 
         # 特徴量を抽出（これまでのタスクに含まれるすべてのサンプル）
+        # if opt.use_dp:
+        #     features, labels, layer_outputs = extract_features(opt=opt, model=model.module, data_loader=data_loaders["train"])
+        # else:
         features, labels, layer_outputs = extract_features(opt=opt, model=model, data_loader=data_loaders["train"])
         print("1 features.shape: ", features.shape)
         print("1 labels.shape: ", labels.shape)
