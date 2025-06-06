@@ -36,7 +36,10 @@ class ISSupConLoss(nn.Module):
         if len(features.shape) > 2:
             features = features.view(features.shape[0], -1)
 
+        # バッチサイズ
         batch_size = features.shape[0]
+        
+        # 
         if labels is not None and mask is not None:
             raise ValueError('Cannot define both `labels` and `mask`')
         elif labels is None and mask is None:
@@ -201,9 +204,9 @@ class ISSupConLoss(nn.Module):
         # 重要度重みの値を補正する
         with torch.no_grad():
             _importance_weight = importance_weight * (mask * mask.sum(dim=1, keepdim=True)).sum(dim=0)
-        print("importance_weight.shape: ", importance_weight.shape)   # importance_weight.shape:  torch.Size([512])
-        print("importance_weight[0:3]: ", importance_weight[0:3])
-        print("_importance_weight[0:3]: ", _importance_weight[0:3])
+        # print("importance_weight.shape: ", importance_weight.shape)   # importance_weight.shape:  torch.Size([512])
+        # print("importance_weight[0:3]: ", importance_weight[0:3])
+        # print("_importance_weight[0:3]: ", _importance_weight[0:3])
         # assert False
 
 

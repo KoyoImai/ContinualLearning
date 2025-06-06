@@ -129,6 +129,7 @@ def parse_option():
     parser.add_argument('--seed', type=int, default=777)
     parser.add_argument('--date', type=str, default="2001_05_02")
     parser.add_argument('--earlystop', default=False, action='store_true', help='')
+    parser.add_argument('--epoch_save', default=False, action='store_true')   # エポック毎にモデルを保存
 
     parser.add_argument('--offline', default=False, action='store_true')
 
@@ -631,6 +632,15 @@ def main():
             train(opt=opt, model=model, model2=model2, criterion=criterion,
                   optimizer=method_tools["optimizer"], scheduler=scheduler, dataloader=dataloader,
                   epoch=epoch, method_tools=method_tools)
+            
+            # epoch毎にパラメータを保存
+            if opt.epoch_save:
+                dir_path = f"{opt.model_path}/task{opt.target_task:02d}"
+                file_path = f"{dir_path}/model_epoch{epoch:03d}.pth"
+                if not os.path.exists(dir_path):
+                    os.makedirs(dir_path)
+                save_model(model, method_tools["optimizer"], opt, opt.epochs, file_path)
+
             
         # タスク終了後の後処理（gpmなどの後処理が必要な手法のため）
         method_tools, model2 = post_process(opt=opt, model=model, model2=model2, dataloader=dataloader, criterion=criterion, method_tools=method_tools, replay_indices=replay_indices)

@@ -11,6 +11,8 @@ def score_computing(val_loader, model, model2, criterion, subset_sample_num, sco
     
     model.eval()
     max_iter = opt.max_iter
+
+    # print("max_iter: ", max_iter)   # max_iter:  5
     
     for k, v in model.named_parameters():
         if k == 'prototypes.weight':
@@ -28,24 +30,36 @@ def score_computing(val_loader, model, model2, criterion, subset_sample_num, sco
 
     for i in range(max_iter):
 
+        # listの初期化
         index_list, score_list, label_list = [], [], []
+        
+        # スコア合計の初期化
         score_sum = torch.zeros(cur_task_n_cls, cur_task_n_cls)
+        # print("score_sum.shape: ", score_sum.shape)               # [クラス数, クラス数]
 
         for idx, (images, labels, importance_weight, index) in enumerate(val_loader):
+            
+            # インデックスリストとラベルリストを更新
             index_list += index
             label_list += labels
         
+            # gpuに配置
             if torch.cuda.is_available():
                 images = images.cuda(non_blocking=True)
                 labels = labels.cuda(non_blocking=True)
+            
+            # バッチサイズの獲得
             bsz = labels.shape[0]
 
             with torch.no_grad():
+
+                # 過去タスクサンプルを取り出すためのマスク
                 prev_task_mask = labels < opt.target_task * opt.cls_per_task
         
+                # 特徴量と出力を獲得
                 features, output = model(images)
 
-                # ISSupCon
+                # 提案分布gの計算
                 score_mat, batch_score_sum  = criterion.score_calculate(output, features, labels, importance_weight,index,
                                                                         target_labels=list(range(opt.target_task*opt.cls_per_task, (opt.target_task+1)*opt.cls_per_task)),
                                                                         sample_num = subset_sample_num, score_mask=score_mask)
@@ -87,7 +101,7 @@ def postprocess_cclis(opt, model, model2, method_tools, criterion, replay_indice
     subset_sample_num = method_tools["subset_sample_num"]
     val_targets = method_tools["val_targets"]
 
-    print("score_mask: ", score_mask)
+    # print("score_mask: ", score_mask)
     score_mask, index, _score, model2 = score_computing(val_loader, model, model2, criterion, subset_sample_num, score_mask, opt)  # compute score
 
     print(opt.target_task)
