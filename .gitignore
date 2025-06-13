@@ -1,4 +1,5 @@
 CIL/logs/
+Analysis/logs/
 
 __pycache__/
 *.pyc
@@ -8,4 +9,3 @@ __pycache__/
 *.log
 .vscode/
 *.pdf
-.Analysis/logs
