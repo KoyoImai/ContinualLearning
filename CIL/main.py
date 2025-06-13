@@ -55,6 +55,7 @@ def parse_option():
     parser.add_argument('--lr', type=float, default=0.1)
     parser.add_argument('--batch_size', type=int, default=10)
     parser.add_argument('--vanilla_batch_size', type=int, default=500)
+    parser.add_argument('--milestone', type=int, nargs='+')
 
 
     # classifierの学習条件(Co2Lなど線形分類で後から評価する手法用)
@@ -512,6 +513,9 @@ def make_scheduler(opt, epochs, dataloader, method_tools):
     if opt.method in ["gpm"]:
         scheduler = None
     
+    elif opt.method in ['er']:
+        scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=opt.milestone, gamma=0.1)
+
     elif opt.method in ["co2l", "simclr"]:
         print("len(dataloader): ", len(dataloader))
         if opt.target_task == 0:
