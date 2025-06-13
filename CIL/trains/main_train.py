@@ -33,6 +33,9 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
 
     
     if opt.method == "er":
+        
+        scheduler.step()
+
         loss, _ = train_er(opt, model, model2, criterion, optimizer,
                            scheduler, train_loader, val_loader, epoch)
         classil_acc, taskil_acc = val_er(opt, model, model2, criterion,

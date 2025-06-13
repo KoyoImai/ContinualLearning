@@ -67,12 +67,16 @@ def train_er(opt, model, model2, criterion, optimizer, scheduler, train_loader, 
         loss.backward()
         optimizer.step()
 
+        # 現在の学習率
+        current_lr = optimizer.param_groups[0]['lr']
+
         # 学習記録の表示
         if (idx+1) % opt.print_freq == 0 or idx+1 == len(train_loader):
             print('Train: [{0}][{1}/{2}]\t'
                   'loss {loss.val:.3f} ({loss.avg:.3f})\t'
-                  'Acc@1 {top1:.3f} {task_il:.3f}'.format(
-                   epoch, idx + 1, len(train_loader), loss=losses, top1=np.sum(corr)/np.sum(cnt)*100., task_il=correct_task/np.sum(cnt)*100.))
+                  'Acc@1 {top1:.3f} {task_il:.3f}\t'
+                  'lr {lr:.5f}'.format(
+                   epoch, idx + 1, len(train_loader), loss=losses, top1=np.sum(corr)/np.sum(cnt)*100., task_il=correct_task/np.sum(cnt)*100., lr=current_lr))
 
     return losses.avg, model2
 
