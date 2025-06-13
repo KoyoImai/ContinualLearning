@@ -18,6 +18,10 @@ def train_er(opt, model, model2, criterion, optimizer, scheduler, train_loader, 
     # 学習記録
     losses = AverageMeter()
 
+    corr = [0.] * (opt.target_task + 1) * opt.cls_per_task
+    cnt  = [0.] * (opt.target_task + 1) * opt.cls_per_task
+    correct_task = 0.0
+
     for idx, (images, labels) in enumerate(train_loader):
 
         # gpu上に配置
@@ -38,6 +42,26 @@ def train_er(opt, model, model2, criterion, optimizer, scheduler, train_loader, 
         # update metric
         losses.update(loss.item(), bsz)
 
+
+        # 正解率の計算
+        cls_list = np.unique(labels.cpu())
+        correct_all = (y_pred.argmax(1) == labels)
+
+        for tc in cls_list:
+            mask = labels == tc
+            correct_task += (y_pred[mask, (tc // opt.cls_per_task) * opt.cls_per_task : ((tc // opt.cls_per_task)+1) * opt.cls_per_task].argmax(1) == (tc % opt.cls_per_task)).float().sum()
+
+        for c in cls_list:
+            mask = labels == c
+            corr[c] += correct_all[mask].float().sum().item()
+            cnt[c] += mask.float().sum().item()
+
+        if idx % opt.print_freq == 0:
+            print('Test: [{0}/{1}]\t'
+                    'Acc@1 {top1:.3f} {task_il:.3f}'.format(
+                        idx, len(val_loader),top1=np.sum(corr)/np.sum(cnt)*100., task_il=correct_task/np.sum(cnt)*100.
+                    ))
+
         # 最適化ステップ
         optimizer.zero_grad()
         loss.backward()
@@ -46,8 +70,9 @@ def train_er(opt, model, model2, criterion, optimizer, scheduler, train_loader, 
         # 学習記録の表示
         if (idx+1) % opt.print_freq == 0 or idx+1 == len(train_loader):
             print('Train: [{0}][{1}/{2}]\t'
-                  'loss {loss.val:.3f} ({loss.avg:.3f})'.format(
-                   epoch, idx + 1, len(train_loader), loss=losses))
+                  'loss {loss.val:.3f} ({loss.avg:.3f})\t'
+                  'Acc@1 {top1:.3f} {task_il:.3f}'.format(
+                   epoch, idx + 1, len(train_loader), loss=losses, top1=np.sum(corr)/np.sum(cnt)*100., task_il=correct_task/np.sum(cnt)*100.))
 
     return losses.avg, model2
 

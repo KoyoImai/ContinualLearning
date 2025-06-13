@@ -29,7 +29,7 @@ def parse_option():
     # 手法
     parser.add_argument('--method', type=str, default="",
                         choices=['er', 'co2l', 'gpm', 'lucir', 'fs-dgpm', 'cclis', 'supcon', 'supcon-joint', 'simclr',
-                                 'cclis-bw','cclis-wo', 'cclis-wo-ss', 'cclis-wo-is', 'cclis-rfr'])
+                                 'cclis-bw','cclis-wo', 'cclis-wo-replay', 'cclis-wo-ss', 'cclis-wo-is', 'cclis-rfr'])
 
     # logの名前（実行毎に変えてね）
     parser.add_argument('--log_name', type=str, default="practice")
@@ -203,6 +203,8 @@ def make_setup(opt):
 
     method_tools = {}
 
+    print("opt.method: ", opt.method)
+
     # 手法毎にモデル構造，損失関数，最適化手法を作成
     if opt.method == "er":
 
@@ -313,7 +315,7 @@ def make_setup(opt):
                                 weight_decay=opt.weight_decay)
         assert False
 
-    elif opt.method in ["cclis", "cclis-wo-ss", "cclis-wo-is"]:
+    elif opt.method in ["cclis", "cclis-wo-replay", "cclis-wo-ss", "cclis-wo-is"]:
 
         from losses.loss_cclis import ISSupConLoss
 
@@ -574,6 +576,10 @@ def main():
 
     # modelの作成，損失関数の作成，Optimizerの作成
     model, model2, criterion, method_tools = make_setup(opt)
+    print("model: ", model)
+    # param = model.encoder.conv1.weight.data
+    # print("param: ", param)
+    
 
     # バッファ内データのインデックス
     replay_indices = None

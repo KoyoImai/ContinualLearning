@@ -114,7 +114,7 @@ def set_buffer(opt, model, prev_indices=None, method_tools=None):
         method_tools["val_targets"] = val_targets
 
     
-    elif opt.method in ['supcon-joint']:
+    elif opt.method in ['supcon-joint', 'cclis-wo-replay']:
 
         replay_indices = []
         
