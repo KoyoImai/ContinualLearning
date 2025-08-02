@@ -142,6 +142,93 @@ def set_valloader_co2l_cifar10(opt, normalize):
     return val_loader
 
 
+
+# ある１クラスのサンプルのみを含む検証用データローダーの作成cifar10
+def set_grad_loader_co2l_cifar10(opt, train, normalize):
+
+    train_transform = transforms.Compose([
+        transforms.Resize(size=(opt.size, opt.size)),
+        transforms.RandomResizedCrop(size=opt.size, scale=(0.1, 1.)),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomApply([
+            transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
+        ], p=0.8),
+        transforms.RandomGrayscale(p=0.2),
+        transforms.RandomApply([transforms.GaussianBlur(kernel_size=opt.size//20*2+1, sigma=(0.1, 2.0))], p=0.5 if opt.size>32 else 0.0),
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    val_loaders = []
+
+    for tc in range(opt.n_cls):
+
+        subset_indices = []
+        _val_dataset = datasets.CIFAR10(root=opt.data_folder,
+                                        train=False,
+                                        transform=TwoCropTransform(train_transform))
+
+        subset_indices += np.where(np.array(_val_dataset.targets) == tc)[0].tolist()
+        val_dataset =  Subset(_val_dataset, subset_indices)
+        bsz = len(val_dataset)
+        print("vak_dataset size: ", len(val_dataset))
+        val_loader = torch.utils.data.DataLoader(
+            val_dataset, batch_size=bsz, shuffle=False,
+            num_workers=8, pin_memory=True)
+        
+        val_loaders += [val_loader]
+
+    return val_loaders
+
+
+# ある１タスクのサンプルのみを含む検証用データローダーの作成cifar10
+def set_gradtask_loader_co2l_cifar10(opt, train, normalize):
+
+    train_transform = transforms.Compose([
+        transforms.Resize(size=(opt.size, opt.size)),
+        transforms.RandomResizedCrop(size=opt.size, scale=(0.1, 1.)),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomApply([
+            transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
+        ], p=0.8),
+        transforms.RandomGrayscale(p=0.2),
+        transforms.RandomApply([transforms.GaussianBlur(kernel_size=opt.size//20*2+1, sigma=(0.1, 2.0))], p=0.5 if opt.size>32 else 0.0),
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    val_loaders = []
+
+    for task_id in range(opt.n_task):
+        target_classes = list(range(task_id*opt.cls_per_task, (task_id+1)*opt.cls_per_task))
+
+        subset_indices = []
+        _val_dataset = datasets.CIFAR10(root=opt.data_folder,
+                                        train=False,
+                                        transform=TwoCropTransform(train_transform))
+
+        for tc in target_classes:
+            subset_indices += np.where(np.array(_val_dataset.targets) == tc)[0].tolist()
+
+        val_dataset =  Subset(_val_dataset, subset_indices)
+        bsz = len(val_dataset)
+        print("vak_dataset size: ", len(val_dataset))
+        val_loader = torch.utils.data.DataLoader(
+            val_dataset, batch_size=bsz, shuffle=False,
+            num_workers=8, pin_memory=True)
+        
+        val_loaders += [val_loader]
+
+    return val_loaders
+
+
+
+
+
+
+
+
+
 # 訓練用cifar100
 def set_loader_co2l_cifar100(opt, normalize, replay_indices):
 
@@ -267,6 +354,91 @@ def set_valloader_co2l_cifar100(opt, normalize):
     return val_loader
     
 
+# ある１クラスのサンプルのみを含む検証用データローダーの作成cifar10
+def set_grad_loader_co2l_cifar100(opt, train, normalize):
+
+    train_transform = transforms.Compose([
+        transforms.Resize(size=(opt.size, opt.size)),
+        transforms.RandomResizedCrop(size=opt.size, scale=(0.1, 1.)),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomApply([
+            transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
+        ], p=0.8),
+        transforms.RandomGrayscale(p=0.2),
+        transforms.RandomApply([transforms.GaussianBlur(kernel_size=opt.size//20*2+1, sigma=(0.1, 2.0))], p=0.5 if opt.size>32 else 0.0),
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    val_loaders = []
+
+    for tc in range(opt.n_cls):
+
+        subset_indices = []
+        _val_dataset = datasets.CIFAR100(root=opt.data_folder,
+                                        transform=TwoCropTransform(train_transform),
+                                        train=train,
+                                        download=True)
+
+        subset_indices += np.where(np.array(_val_dataset.targets) == tc)[0].tolist()
+        val_dataset =  Subset(_val_dataset, subset_indices)
+        bsz = len(val_dataset)
+        print("vak_dataset size: ", len(val_dataset))
+        val_loader = torch.utils.data.DataLoader(
+            val_dataset, batch_size=bsz, shuffle=False,
+            num_workers=8, pin_memory=True)
+        
+        val_loaders += [val_loader]
+
+    return val_loaders
+
+
+# ある１タスクのサンプルのみを含む検証用データローダーの作成cifar100
+def set_gradtask_loader_co2l_cifar100(opt, train, normalize):
+
+    train_transform = transforms.Compose([
+        transforms.Resize(size=(opt.size, opt.size)),
+        transforms.RandomResizedCrop(size=opt.size, scale=(0.1, 1.)),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomApply([
+            transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
+        ], p=0.8),
+        transforms.RandomGrayscale(p=0.2),
+        transforms.RandomApply([transforms.GaussianBlur(kernel_size=opt.size//20*2+1, sigma=(0.1, 2.0))], p=0.5 if opt.size>32 else 0.0),
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    val_loaders = []
+
+    for task_id in range(opt.n_task):
+        target_classes = list(range(task_id*opt.cls_per_task, (task_id+1)*opt.cls_per_task))
+
+        subset_indices = []
+        _val_dataset = datasets.CIFAR100(root=opt.data_folder,
+                                         train=False,
+                                         transform=TwoCropTransform(train_transform))
+
+        for tc in target_classes:
+            subset_indices += np.where(np.array(_val_dataset.targets) == tc)[0].tolist()
+
+        val_dataset =  Subset(_val_dataset, subset_indices)
+        bsz = len(val_dataset)
+        print("vak_dataset size: ", len(val_dataset))
+        val_loader = torch.utils.data.DataLoader(
+            val_dataset, batch_size=bsz, shuffle=False,
+            num_workers=8, pin_memory=True)
+        
+        val_loaders += [val_loader]
+
+    return val_loaders
+
+
+
+
+
+
+
 # 訓練用tiny-imagenet
 def set_loader_co2l_tinyimagenet(opt, normalize, replay_indices):
 
@@ -317,7 +489,7 @@ def set_linearloader_co2l_tinyimagenet(opt, normalize, replay_indices):
 
     train_transform = transforms.Compose([
         transforms.Resize(size=(opt.size, opt.size)),
-        transforms.RandomResizedCrop(size=opt.size, scale=(0.1, 1.)),
+        transforms.RandomResizedCrop(size=opt.size, scale=(0.2, 1.)),
         transforms.RandomHorizontalFlip(),
         transforms.RandomApply([
             transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
@@ -393,6 +565,84 @@ def set_valloader_co2l_tinyimagenet(opt, normalize):
 
 
 
+# ある１クラスのサンプルのみを含む検証用データローダーの作成tinyimagenet
+def set_grad_loader_co2l_tinyimagenet(opt, train, normalize):
+
+    train_transform = transforms.Compose([
+        transforms.Resize(size=(opt.size, opt.size)),
+        transforms.RandomResizedCrop(size=opt.size, scale=(0.2, 1.)),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomApply([
+            transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
+        ], p=0.8),
+        transforms.RandomGrayscale(p=0.2),
+        transforms.RandomApply([transforms.GaussianBlur(kernel_size=opt.size//20*2+1, sigma=(0.1, 2.0))], p=0.5 if opt.size>32 else 0.0),
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    val_loaders = []
+
+    for tc in range(opt.n_cls):
+
+        subset_indices = []
+        _train_dataset = TinyImagenet(root=opt.data_folder,
+                                      transform=TwoCropTransform(train_transform),
+                                      train=train,
+                                      download=True)
+
+        subset_indices += np.where(np.array(_train_dataset.targets) == tc)[0].tolist()
+        val_dataset =  Subset(_train_dataset, subset_indices)
+        bsz = len(val_dataset)
+        print("vak_dataset size: ", len(val_dataset))
+        val_loader = torch.utils.data.DataLoader(
+            val_dataset, batch_size=bsz, shuffle=False,
+            num_workers=8, pin_memory=True)
+        
+        val_loaders += [val_loader]
+
+    return val_loaders
 
 
 
+
+# ある１タスクのサンプルのみを含む検証用データローダーの作成tinyimagenet
+def set_gradtask_loader_co2l_tinyimagenet(opt, train, normalize):
+
+    train_transform = transforms.Compose([
+        transforms.Resize(size=(opt.size, opt.size)),
+        transforms.RandomResizedCrop(size=opt.size, scale=(0.2, 1.)),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomApply([
+            transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
+        ], p=0.8),
+        transforms.RandomGrayscale(p=0.2),
+        transforms.RandomApply([transforms.GaussianBlur(kernel_size=opt.size//20*2+1, sigma=(0.1, 2.0))], p=0.5 if opt.size>32 else 0.0),
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    val_loaders = []
+
+    for task_id in range(opt.n_task):
+        target_classes = list(range(task_id*opt.cls_per_task, (task_id+1)*opt.cls_per_task))
+
+        subset_indices = []
+        _val_dataset = TinyImagenet(root=opt.data_folder,
+                                    transform=TwoCropTransform(train_transform),
+                                    train=train,
+                                    download=True)
+
+        for tc in target_classes:
+            subset_indices += np.where(np.array(_val_dataset.targets) == tc)[0].tolist()
+
+        val_dataset =  Subset(_val_dataset, subset_indices)
+        bsz = len(val_dataset)
+        print("vak_dataset size: ", len(val_dataset))
+        val_loader = torch.utils.data.DataLoader(
+            val_dataset, batch_size=bsz, shuffle=False,
+            num_workers=8, pin_memory=True)
+        
+        val_loaders += [val_loader]
+
+    return val_loaders

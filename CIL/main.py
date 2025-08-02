@@ -29,7 +29,7 @@ def parse_option():
     # 手法
     parser.add_argument('--method', type=str, default="",
                         choices=['er', 'co2l', 'gpm', 'lucir', 'fs-dgpm', 'cclis', 'supcon', 'supcon-joint', 'simclr',
-                                 'cclis-bw','cclis-wo', 'cclis-wo-replay', 'cclis-wo-ss', 'cclis-wo-is', 'cclis-rfr'])
+                                 'cclis-bw','cclis-wo', 'cclis-wo-replay', 'cclis-wo-ss', 'cclis-wo-is', 'cclis-rfr', 'cclis-grad'])
 
     # logの名前（実行毎に変えてね）
     parser.add_argument('--log_name', type=str, default="practice")
@@ -131,6 +131,10 @@ def parse_option():
     parser.add_argument('--date', type=str, default="2001_05_02")
     parser.add_argument('--earlystop', default=False, action='store_true', help='')
     parser.add_argument('--epoch_save', default=False, action='store_true')   # エポック毎にモデルを保存
+
+    # 勾配解析用
+    parser.add_argument('--grad_analysis', default=False, action='store_true')
+    parser.add_argument('--grad_analysis_freq', type=int, default=10)
 
     parser.add_argument('--offline', default=False, action='store_true')
 
@@ -316,7 +320,7 @@ def make_setup(opt):
                                 weight_decay=opt.weight_decay)
         assert False
 
-    elif opt.method in ["cclis", "cclis-wo-replay", "cclis-wo-ss", "cclis-wo-is"]:
+    elif opt.method in ["cclis", "cclis-wo-replay", "cclis-wo-ss", "cclis-wo-is", "cclis-grad"]:
 
         from losses.loss_cclis import ISSupConLoss
 
@@ -549,7 +553,7 @@ def make_scheduler(opt, epochs, dataloader, method_tools):
         else:
             scheduler = lr_scheduler.OneCycleLR(optimizer, max_lr=opt.learning_rate, total_steps=total_steps, pct_start=0.1, anneal_strategy='cos')
     
-    elif opt.method in ["cclis", "cclis-bw", "cclis-wo", "cclis-rfr"]:   # 別の方法でschedulerを実装
+    elif opt.method in ["cclis", "cclis-bw", "cclis-wo", "cclis-rfr", "cclis-grad"]:   # 別の方法でschedulerを実装
         scheduler = None
     else:
         assert False

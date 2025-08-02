@@ -1,3 +1,5 @@
+import os
+import csv
 import logging
 import numpy as np
 
@@ -12,7 +14,7 @@ from models.resnet_cifar_co2l import LinearClassifier
 logger = logging.getLogger(__name__)
 
 
-def train_co2l(opt, model, model2, criterion, optimizer, scheduler, train_loader, epoch):
+def train_co2l(opt, model, model2, criterion, optimizer, scheduler, train_loader, grad_train_loaders, grad_val_loaders, gradtask_train_loaders, gradtask_val_loaders, epoch):
 
     # modelをtrainモードに変更
     model.train()
@@ -89,8 +91,222 @@ def train_co2l(opt, model, model2, criterion, optimizer, scheduler, train_loader
                   'loss {loss.val:.3f} ({loss.avg:.3f})\t'
                   'lr {lr:.5f}'.format(
                    epoch, idx + 1, len(train_loader), loss=losses, lr=current_lr))
+            
+
+    # 勾配分析（訓練用）
+    if (opt.grad_analysis and epoch == opt.epochs-1) or (opt.grad_analysis and epoch % opt.grad_analysis_freq == 0):
+        grad_analysis_supcon(opt, model, optimizer, criterion, grad_train_loaders, epoch)
+        if opt.target_task > 0:
+            grad_analysis_distill(opt, model, model2, optimizer, criterion, grad_train_loaders, epoch)
+    
+
+
+
+
     
     return losses.avg, model2
+
+
+
+def grad_analysis_supcon(opt, model, optimizer, criterion, grad_loaders, epoch):
+
+    if (opt.grad_analysis and epoch == opt.epochs-1) or (opt.grad_analysis and epoch % opt.grad_analysis_freq == 0):
+
+        grad_log_path = f"{opt.explog_path}/gradtask_train_supcon_log.csv"
+        is_new_file = not os.path.exists(grad_log_path)
+        print("grad_log_path: ", grad_log_path)
+
+        with open(grad_log_path, mode='a', newline='') as f:
+
+            writer = csv.writer(f)
+            if is_new_file:
+                writer.writerow(['epoch', 'task', 'layer', 'param_type', 'index', 'grad_value'])
+
+            for taskid, loader in enumerate(grad_loaders):
+
+                for (images, labels) in loader:
+
+                    images = torch.cat([images[0], images[1]], dim=0)
+                    if torch.cuda.is_available():
+                        images = images.cuda(non_blocking=True)
+                        labels = labels.cuda(non_blocking=True)
+                    
+                    bsz = labels.shape[0]
+
+                    # modelにデータを入力
+                    features, encoded = model(images, return_feat=True)
+
+                    # 非対称な教師あり対照損失
+                    f1, f2 = torch.split(features, [bsz, bsz], dim=0)
+                    features = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1)], dim=1)
+                    loss = criterion(features, labels, target_labels=list(range(opt.target_task*opt.cls_per_task, (opt.target_task+1)*opt.cls_per_task)))
+
+                    optimizer.zero_grad()
+                    model.zero_grad()
+                    loss.backward()
+
+                    
+                    # 勾配情報をカーネル単位で出力
+                    for name, param in model.named_parameters():
+                        if param.requires_grad:
+
+                            param_type = name.split('.')[-1]  # パラメータのタイプ（例: weight, bias）
+                            layer_name = '.'.join(name.split('.')[:-1])  # レイヤー名
+                            grad = param.grad.detach().cpu()
+                    
+
+                            if grad.dim() == 4:  # Conv: [out_ch, in_ch, kH, kW]
+                                grad = grad.view(grad.shape[0], -1)  # [out_ch, *]
+                                abs_sum = grad.abs().sum(dim=1)
+                                for i, g in enumerate(abs_sum):
+                                    writer.writerow([
+                                        epoch,
+                                        int(labels[0].item()),  # 代表クラス
+                                        layer_name,
+                                        param_type,
+                                        str([i]),  # カーネル index
+                                        g.item()
+                                    ])
+
+                            elif grad.dim() == 2:  # Linear: [out_dim, in_dim]
+                                abs_sum = grad.abs().sum(dim=1)
+                                for i, g in enumerate(abs_sum):
+                                    writer.writerow([
+                                        epoch,
+                                        int(labels[0].item()),
+                                        layer_name,
+                                        param_type,
+                                        str([i]),  # 出力ユニット index
+                                        g.item()
+                                    ])
+
+                            elif grad.dim() == 1:  # Bias: [N]
+                                for i, g in enumerate(grad.abs()):
+                                    writer.writerow([
+                                        epoch,
+                                        int(labels[0].item()),
+                                        layer_name,
+                                        param_type,
+                                        str([i]),
+                                        g.item()
+                                    ])
+
+
+
+def grad_analysis_distill(opt, model, model2, optimizer, criterion, grad_loaders, epoch):
+
+    if (opt.grad_analysis and epoch == opt.epochs-1) or (opt.grad_analysis and epoch % opt.grad_analysis_freq == 0):
+
+        grad_log_path = f"{opt.explog_path}/gradtask_train_distill_log.csv"
+        is_new_file = not os.path.exists(grad_log_path)
+        print("grad_log_path: ", grad_log_path)
+
+        with open(grad_log_path, mode='a', newline='') as f:
+
+            writer = csv.writer(f)
+            if is_new_file:
+                writer.writerow(['epoch', 'task', 'layer', 'param_type', 'index', 'grad_value'])
+
+            for taskid, loader in enumerate(grad_loaders):
+
+                for (images, labels) in loader:
+
+                    images = torch.cat([images[0], images[1]], dim=0)
+                    if torch.cuda.is_available():
+                        images = images.cuda(non_blocking=True)
+                        labels = labels.cuda(non_blocking=True)
+                    bsz = labels.shape[0]
+
+                    with torch.no_grad():
+                        prev_task_mask = labels < opt.target_task * opt.cls_per_task
+                        prev_task_mask = prev_task_mask.repeat(2)
+
+                    # modelにデータを入力
+                    features, encoded = model(images, return_feat=True)
+
+                    # IRD損失の一部（現在タスク）を計算
+                    if opt.target_task > 0:
+                        features1_prev_task = features
+
+                        features1_sim = torch.div(torch.matmul(features1_prev_task, features1_prev_task.T), opt.current_temp)
+                        logits_mask = torch.scatter(
+                            torch.ones_like(features1_sim),
+                            1,
+                            torch.arange(features1_sim.size(0)).view(-1, 1).cuda(non_blocking=True),
+                            0
+                        )
+                        logits_max1, _ = torch.max(features1_sim * logits_mask, dim=1, keepdim=True)
+                        features1_sim = features1_sim - logits_max1.detach()
+                        row_size = features1_sim.size(0)
+                        logits1 = torch.exp(features1_sim[logits_mask.bool()].view(row_size, -1)) / torch.exp(features1_sim[logits_mask.bool()].view(row_size, -1)).sum(dim=1, keepdim=True)
+
+                    # IRD損失の一部（過去タスク）を計算
+                    if opt.target_task > 0:
+                        with torch.no_grad():
+                            features2_prev_task = model2(images)
+
+                            features2_sim = torch.div(torch.matmul(features2_prev_task, features2_prev_task.T), opt.past_temp)
+                            logits_max2, _ = torch.max(features2_sim*logits_mask, dim=1, keepdim=True)
+                            features2_sim = features2_sim - logits_max2.detach()
+                            logits2 = torch.exp(features2_sim[logits_mask.bool()].view(row_size, -1)) /  torch.exp(features2_sim[logits_mask.bool()].view(row_size, -1)).sum(dim=1, keepdim=True)
+
+
+                        loss_distill = (-logits2 * torch.log(logits1)).sum(1).mean()
+                        loss = opt.distill_power * loss_distill
+                    
+                    
+                    optimizer.zero_grad()
+                    model.zero_grad()
+                    loss.backward()
+
+                    
+                    # 勾配情報をカーネル単位で出力
+                    for name, param in model.named_parameters():
+                        if param.requires_grad:
+
+                            param_type = name.split('.')[-1]  # パラメータのタイプ（例: weight, bias）
+                            layer_name = '.'.join(name.split('.')[:-1])  # レイヤー名
+                            grad = param.grad.detach().cpu()
+                    
+
+                            if grad.dim() == 4:  # Conv: [out_ch, in_ch, kH, kW]
+                                grad = grad.view(grad.shape[0], -1)  # [out_ch, *]
+                                abs_sum = grad.abs().sum(dim=1)
+                                for i, g in enumerate(abs_sum):
+                                    writer.writerow([
+                                        epoch,
+                                        int(labels[0].item()),  # 代表クラス
+                                        layer_name,
+                                        param_type,
+                                        str([i]),  # カーネル index
+                                        g.item()
+                                    ])
+
+                            elif grad.dim() == 2:  # Linear: [out_dim, in_dim]
+                                abs_sum = grad.abs().sum(dim=1)
+                                for i, g in enumerate(abs_sum):
+                                    writer.writerow([
+                                        epoch,
+                                        int(labels[0].item()),
+                                        layer_name,
+                                        param_type,
+                                        str([i]),  # 出力ユニット index
+                                        g.item()
+                                    ])
+
+                            elif grad.dim() == 1:  # Bias: [N]
+                                for i, g in enumerate(grad.abs()):
+                                    writer.writerow([
+                                        epoch,
+                                        int(labels[0].item()),
+                                        layer_name,
+                                        param_type,
+                                        str([i]),
+                                        g.item()
+                                    ])
+
+
+
 
 
 def val_co2l(opt, model, model2, linear_loader, val_loader, taskil_loaders, epoch):
@@ -276,9 +492,6 @@ def taskil_val_co2l(opt, model, classifier,  criterion, val_loaders):
         print(f"[Task {taskid}] Loss: {losses.avg:.4f}, Accuracy: {task_accuracy:.2f}%")
 
     return all_task_accuracies, all_task_losses
-
-
-
 
 
 def ncm_co2l(model, ncm_loader, val_loader):

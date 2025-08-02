@@ -15,7 +15,7 @@ from trains.train_supcon import train_supcon
 from trains.train_cclis_bw import train_cclis_bw
 from trains.train_cclis_rfr import train_cclis_rfr
 from trains.train_simclr import train_simclr
-
+# from trains.train_cclis_grad import train_cclis_grad
 
 
 logger = logging.getLogger(__name__)
@@ -30,14 +30,20 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
     vanilla_loader = dataloader["vanilla"]
     ncm_loader = dataloader["ncm"]
     taskil_loaders = dataloader["taskil"]
+    grad_train_loaders = dataloader["grad_train"]
+    grad_val_loaders = dataloader["grad_val"]
+    gradtask_train_loaders = dataloader["gradtask_train"]
+    gradtask_val_loaders = dataloader["gradtask_val"]
+
 
     
     if opt.method == "er":
         
         scheduler.step()
 
-        loss, _ = train_er(opt, model, model2, criterion, optimizer,
-                           scheduler, train_loader, val_loader, epoch)
+        loss, _ = train_er(opt, model, model2, criterion, optimizer, scheduler,
+                           train_loader, val_loader, grad_train_loaders, grad_val_loaders,
+                           gradtask_train_loaders, gradtask_val_loaders, epoch)
         classil_acc, taskil_acc = val_er(opt, model, model2, criterion,
                                          optimizer, scheduler, train_loader, val_loader, epoch)
         ncm_acc = ncm_er(model, ncm_loader, val_loader)
@@ -57,7 +63,9 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
         
         loss, model2 = train_co2l(opt=opt, model=model, model2=model2,
                                   criterion=criterion, optimizer=optimizer,
-                                  scheduler=scheduler, train_loader=train_loader, epoch=epoch)
+                                  scheduler=scheduler, train_loader=train_loader,
+                                  grad_train_loaders=grad_train_loaders, grad_val_loaders=grad_val_loaders,
+                                  gradtask_train_loaders=gradtask_train_loaders, gradtask_val_loaders=gradtask_val_loaders, epoch=epoch)
         if epoch % 50 == 0:
             classil_acc, taskil_acc, all_task_accuracies, all_task_losses = val_co2l(opt, model, model2, linear_loader, val_loader, taskil_loaders, epoch)
             # 各タスクの精度を「task0 acc=100.00, task1 acc=90.00」の形式で整形
@@ -247,6 +255,28 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
                         {taskil_acc_str}")
 
 
+    elif opt.method in ["cclis-grad"]:
+
+        adjust_learning_rate_cclis(opt, optimizer, epoch)
+
+        subset_sample_num = method_tools["subset_sample_num"]
+        score_mask = method_tools["score_mask"]
+
+        loss, model2 = train_cclis_grad(opt=opt, model=model, model2=model2,
+                                        criterion=criterion, optimizer=optimizer,
+                                        subset_sample_num=subset_sample_num, score_mask=score_mask,
+                                        scheduler=scheduler, train_loader=train_loader, epoch=epoch)
+        if epoch % 50 == 0:
+            classil_acc, taskil_acc, all_task_accuracies, all_task_losses = val_cclis(opt, model, model2, linear_loader, val_loader, taskil_loaders, epoch)
+            # 各タスクの精度を「task0 acc=100.00, task1 acc=90.00」の形式で整形
+            taskil_acc_str = ', '.join([f"task{i} acc={acc:.2f}" for i, acc in enumerate(all_task_accuracies)])
+
+            ncm_acc = ncm_cclis(model, ncm_loader, val_loader)
+
+            logger.info(f"task {opt.target_task} Epoch {epoch}: train_loss={loss:.4f}, \
+                        ClassIL_accuracy={classil_acc:.3f}, TaskIL_accuracy={taskil_acc:.3f}, NCM_accuracy={ncm_acc:.3f}, \
+                        {taskil_acc_str}")
+            
     else:
         assert False
         

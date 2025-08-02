@@ -180,6 +180,76 @@ def set_taskil_valloader_er_cifar10(opt, normalize):
 
 
 
+# ある１クラスのサンプルのみを含む検証用データローダーの作成cifar10
+def set_gard_loader_er_cifar10(opt, train, normalize):
+
+    val_transform = transforms.Compose([
+        transforms.Resize(size=(opt.size, opt.size)),
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    val_loaders = []
+
+    for tc in range(opt.n_cls):
+
+        subset_indices = []
+        _val_dataset = datasets.CIFAR10(root=opt.data_folder,
+                                        train=False,
+                                        transform=val_transform)
+
+        subset_indices += np.where(np.array(_val_dataset.targets) == tc)[0].tolist()
+        val_dataset =  Subset(_val_dataset, subset_indices)
+        bsz = len(val_dataset)
+        print("vak_dataset size: ", len(val_dataset))
+        val_loader = torch.utils.data.DataLoader(
+            val_dataset, batch_size=bsz, shuffle=False,
+            num_workers=8, pin_memory=True)
+        
+
+        
+        val_loaders += [val_loader]
+
+    return val_loaders
+
+
+# ある１タスクのサンプルのみを含む検証用データローダーの作成cifar10
+def set_gardtask_loader_er_cifar10(opt, train, normalize):
+
+    val_transform = transforms.Compose([
+        transforms.Resize(size=(opt.size, opt.size)),
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    val_loaders = []
+
+    for task_id in range(opt.n_task):
+        target_classes = list(range(task_id*opt.cls_per_task, (task_id+1)*opt.cls_per_task))
+
+        subset_indices = []
+        _val_dataset = datasets.CIFAR10(root=opt.data_folder,
+                                        train=False,
+                                        transform=val_transform)
+
+        for tc in target_classes:
+            subset_indices += np.where(np.array(_val_dataset.targets) == tc)[0].tolist()
+
+        val_dataset =  Subset(_val_dataset, subset_indices)
+        bsz = len(val_dataset)
+        print("vak_dataset size: ", len(val_dataset))
+        val_loader = torch.utils.data.DataLoader(
+            val_dataset, batch_size=bsz, shuffle=False,
+            num_workers=8, pin_memory=True)
+        
+        val_loaders += [val_loader]
+
+    return val_loaders
+
+
+
+
+
 
 # 訓練用cifar100
 def set_loader_er_cifar100(opt, normalize, replay_indices):
@@ -362,6 +432,71 @@ def set_taskil_valloader_er_cifar100(opt, normalize):
 
 
 
+# ある１クラスのサンプルのみを含む検証用データローダーの作成cifar100
+def set_gard_loader_er_cifar100(opt, train, normalize):
+
+    train_transform = transforms.Compose([
+        transforms.Resize(size=(opt.size, opt.size)),
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    val_loaders = []
+
+    for tc in range(opt.n_cls):
+
+        subset_indices = []
+        _val_dataset = datasets.CIFAR100(root=opt.data_folder,
+                                         train=False,
+                                         transform=train_transform)
+        
+        subset_indices += np.where(np.array(_val_dataset.targets) == tc)[0].tolist()
+        val_dataset =  Subset(_val_dataset, subset_indices)
+        bsz = len(val_dataset)
+        print("vak_dataset size: ", len(val_dataset))
+
+        val_loader = torch.utils.data.DataLoader(
+            val_dataset, batch_size=bsz, shuffle=None,
+            num_workers=opt.num_workers, pin_memory=True)
+        
+        val_loaders += [val_loader]
+
+    return val_loaders
+
+
+# ある１タスクのサンプルのみを含む検証用データローダーの作成cifar100
+def set_gardtask_loader_er_cifar100(opt, train, normalize):
+
+    val_transform = transforms.Compose([
+        transforms.Resize(size=(opt.size, opt.size)),
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    val_loaders = []
+
+    for task_id in range(opt.n_task):
+        target_classes = list(range(task_id*opt.cls_per_task, (task_id+1)*opt.cls_per_task))
+
+        subset_indices = []
+        _val_dataset = datasets.CIFAR100(root=opt.data_folder,
+                                         train=False,
+                                         transform=val_transform)
+
+        for tc in target_classes:
+            subset_indices += np.where(np.array(_val_dataset.targets) == tc)[0].tolist()
+
+        val_dataset =  Subset(_val_dataset, subset_indices)
+        bsz = len(val_dataset)
+        print("vak_dataset size: ", len(val_dataset))
+        val_loader = torch.utils.data.DataLoader(
+            val_dataset, batch_size=bsz, shuffle=False,
+            num_workers=8, pin_memory=True)
+        
+        val_loaders += [val_loader]
+
+    return val_loaders
+
 
 
 
@@ -542,7 +677,71 @@ def set_taskil_valloader_er_tinyimagenet(opt, normalize):
 
 
 
+# ある１クラスのサンプルのみを含む検証用データローダーの作成tiny-imagenet
+def set_grad_loader_er_tinyimagenet(opt, train, normalize):
 
+    val_transform = transforms.Compose([
+        transforms.Resize(size=(opt.size, opt.size)),
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    val_loaders = []
+
+    for tc in range(opt.n_cls):
+
+        subset_indices = []
+        _val_dataset = TinyImagenet(root=opt.data_folder,
+                                        train=False,
+                                        transform=val_transform)
+
+        subset_indices += np.where(np.array(_val_dataset.targets) == tc)[0].tolist()
+        val_dataset =  Subset(_val_dataset, subset_indices)
+        bsz = len(val_dataset)
+        print("vak_dataset size: ", len(val_dataset))
+
+        val_loader = torch.utils.data.DataLoader(
+            val_dataset, batch_size=bsz, shuffle=False,
+            num_workers=8, pin_memory=True)
+        
+        val_loaders += [val_loader]
+
+    return val_loaders
+
+
+# ある１タスクのサンプルのみを含む検証用データローダーの作成tiny-imagenet
+def set_gardtask_loader_er_tinyimagenet(opt, train, normalize):
+
+    val_transform = transforms.Compose([
+        transforms.Resize(size=(opt.size, opt.size)),
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    val_loaders = []
+
+    for task_id in range(opt.n_task):
+        target_classes = list(range(task_id*opt.cls_per_task, (task_id+1)*opt.cls_per_task))
+
+        subset_indices = []
+        _val_dataset = TinyImagenet(root=opt.data_folder,
+                                        train=False,
+                                        transform=val_transform)
+
+
+        for tc in target_classes:
+            subset_indices += np.where(np.array(_val_dataset.targets) == tc)[0].tolist()
+
+        val_dataset =  Subset(_val_dataset, subset_indices)
+        bsz = len(val_dataset)
+        print("vak_dataset size: ", len(val_dataset))
+        val_loader = torch.utils.data.DataLoader(
+            val_dataset, batch_size=bsz, shuffle=False,
+            num_workers=8, pin_memory=True)
+        
+        val_loaders += [val_loader]
+
+    return val_loaders
 
 
 

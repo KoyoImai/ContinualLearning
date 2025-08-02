@@ -1,3 +1,5 @@
+import os
+import csv
 import logging
 import numpy as np
 
@@ -10,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 
-def train_er(opt, model, model2, criterion, optimizer, scheduler, train_loader, val_loader, epoch):
+def train_er(opt, model, model2, criterion, optimizer, scheduler, train_loader, val_loader, grad_train_loaders, grad_val_loaders, gradtask_train_loaders, gradtask_val_loaders, epoch):
 
     # trainモードに変更
     model.train()
@@ -77,8 +79,112 @@ def train_er(opt, model, model2, criterion, optimizer, scheduler, train_loader, 
                   'Acc@1 {top1:.3f} {task_il:.3f}\t'
                   'lr {lr:.5f}'.format(
                    epoch, idx + 1, len(train_loader), loss=losses, top1=np.sum(corr)/np.sum(cnt)*100., task_il=correct_task/np.sum(cnt)*100., lr=current_lr))
+        
+
+        
+    # 勾配分析（訓練用）
+    grad_analysis_supcon(opt, model, optimizer, criterion, grad_train_loaders, epoch)
+    
+
 
     return losses.avg, model2
+
+
+
+def grad_analysis_supcon(opt, model, optimizer, criterion, grad_train_loaders, epoch):
+
+    if (opt.grad_analysis and epoch == opt.epochs-1) or (opt.grad_analysis and epoch % opt.grad_analysis_freq == 0):
+
+        grad_log_path = f"{opt.explog_path}/grad_train_log.csv"
+        is_new_file = not os.path.exists(grad_log_path)
+        print("grad_log_path: ", grad_log_path)
+
+        with open(grad_log_path, mode='a', newline='') as f:
+
+            writer = csv.writer(f)
+            if is_new_file:
+                writer.writerow(['epoch', 'class', 'layer', 'param_type', 'index', 'grad_value'])
+
+            for taskid, loader in enumerate(grad_train_loaders):
+
+                for data in loader:
+                    inputs, targets = data
+                    inputs, targets = inputs.cuda(), targets.cuda()
+
+                    y_pred = model(inputs)  # ← 修正：元は `images` だった
+                    loss = criterion(y_pred, targets).mean()
+
+                    optimizer.zero_grad()
+                    model.zero_grad()
+                    loss.backward()
+
+
+                    # for name, param in model.named_parameters():
+                    #     if param.requires_grad and param.grad is not None:
+                    #         param_type = name.split('.')[-1]
+                    #         layer_name = '.'.join(name.split('.')[:-1])
+
+                    #         grad_tensor = param.grad.detach().cpu()
+                    #         for index in torch.nonzero(torch.ones_like(grad_tensor), as_tuple=False):
+                    #             grad_value = grad_tensor[tuple(index.tolist())].item()
+                    #             writer.writerow([
+                    #                 epoch,
+                    #                 targets[0].item(),  # 代表として1個目のクラス（バッチ全件分けて出力したければfor loopを工夫）
+                    #                 layer_name,
+                    #                 param_type,
+                    #                 str(index.tolist()),
+                    #                 grad_value
+                    #             ])
+
+                    
+                    # 勾配情報をカーネル単位で出力
+                    for name, param in model.named_parameters():
+                        if param.requires_grad:
+
+                            param_type = name.split('.')[-1]  # パラメータのタイプ（例: weight, bias）
+                            layer_name = '.'.join(name.split('.')[:-1])  # レイヤー名
+                            grad = param.grad.detach().cpu()
+                    
+
+                            if grad.dim() == 4:  # Conv: [out_ch, in_ch, kH, kW]
+                                grad = grad.view(grad.shape[0], -1)  # [out_ch, *]
+                                abs_sum = grad.abs().sum(dim=1)
+                                for i, g in enumerate(abs_sum):
+                                    writer.writerow([
+                                        epoch,
+                                        int(targets[0].item()),  # 代表クラス
+                                        layer_name,
+                                        param_type,
+                                        str([i]),  # カーネル index
+                                        g.item()
+                                    ])
+
+                            elif grad.dim() == 2:  # Linear: [out_dim, in_dim]
+                                abs_sum = grad.abs().sum(dim=1)
+                                for i, g in enumerate(abs_sum):
+                                    writer.writerow([
+                                        epoch,
+                                        int(targets[0].item()),
+                                        layer_name,
+                                        param_type,
+                                        str([i]),  # 出力ユニット index
+                                        g.item()
+                                    ])
+
+                            elif grad.dim() == 1:  # Bias: [N]
+                                for i, g in enumerate(grad.abs()):
+                                    writer.writerow([
+                                        epoch,
+                                        int(targets[0].item()),
+                                        layer_name,
+                                        param_type,
+                                        str([i]),
+                                        g.item()
+                                    ])
+
+
+
+
 
 
 def val_er(opt, model, model2, criterion, optimizer, scheduler, train_loader, val_loader, epoch):
@@ -130,8 +236,6 @@ def val_er(opt, model, model2, criterion, optimizer, scheduler, train_loader, va
     classil_acc = np.sum(corr)/np.sum(cnt)*100.
     taskil_acc = correct_task/np.sum(cnt)*100.
     return classil_acc, taskil_acc
-
-
 
 
 def ncm_er(model, ncm_loader, val_loader):
