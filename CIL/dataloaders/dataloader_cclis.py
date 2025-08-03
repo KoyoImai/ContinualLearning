@@ -53,6 +53,8 @@ class IS_Subset(Dataset):
 #         return super().__len__()
 
 
+
+# 各タスク，各クラスのサンプル数を指定してミニバッチを作成したい
 class BatchSchedulerSampler(torch.utils.data.sampler.Sampler):
     """
     iterate over tasks and provide a random batch per task in each mini-batch
@@ -191,6 +193,113 @@ def set_loader_cclis_cifar10(opt, normalize, replay_indices, method_tools, train
 
 
 
+# ある１クラスのサンプルのみを含む検証用データローダーの作成cifar10
+def set_grad_loader_cclis_cifar10(opt, train, normalize, method_tools):
+
+    importance_weight = method_tools['importance_weight']
+
+    train_transform = transforms.Compose([
+        transforms.Resize(size=(opt.size, opt.size)),
+        transforms.RandomResizedCrop(size=opt.size, scale=(0.1 if opt.dataset=='tiny-imagenet' else 0.2, 1.)),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomApply([
+            transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
+        ], p=0.8),
+        transforms.RandomGrayscale(p=0.2),
+        transforms.RandomApply([transforms.GaussianBlur(kernel_size=opt.size//20*2+1, sigma=(0.1, 2.0))], p=0.5 if opt.size>32 else 0.0),
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    train_loaders = []
+
+    for tc in range(opt.n_cls):
+
+        subset_indices = []
+        subset_importance_weight = []
+
+        _train_dataset = datasets.CIFAR10(root=opt.data_folder,
+                                          train=train,
+                                          transform=train_transform,
+                                          download=True)
+
+        subset_indices += np.where(np.array(_train_dataset.targets) == tc)[0].tolist()  # cur_sample index, list
+        tc_num = (np.array(_train_dataset.targets) == tc).sum()
+        
+        subset_importance_weight += list(np.ones(tc_num) / tc_num)  # cur_sample importance weight, list
+
+        _subset_indices, _subset_importance_weight = copy.deepcopy(subset_indices), copy.deepcopy(subset_importance_weight)
+
+        train_dataset = IS_Subset(_train_dataset, _subset_indices, _subset_importance_weight)
+        bsz = int(len(train_dataset) / 5)
+        print("bsz: ", bsz)
+
+        train_loader = torch.utils.data.DataLoader(
+                            train_dataset, batch_size=bsz, shuffle=True,
+                            num_workers=opt.num_workers, pin_memory=True)
+        
+        train_loaders += [train_loader]
+
+    return train_loaders
+
+
+
+# ある１タスクのサンプルのみを含むデータローダーの作成cifar10
+def set_gradtask_loader_cclis_cifar10(opt, train, normalize, method_tools):
+
+    importance_weight = method_tools['importance_weight']
+
+    train_transform = transforms.Compose([
+        transforms.Resize(size=(opt.size, opt.size)),
+        transforms.RandomResizedCrop(size=opt.size, scale=(0.1 if opt.dataset=='tiny-imagenet' else 0.2, 1.)),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomApply([
+            transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
+        ], p=0.8),
+        transforms.RandomGrayscale(p=0.2),
+        transforms.RandomApply([transforms.GaussianBlur(kernel_size=opt.size//20*2+1, sigma=(0.1, 2.0))], p=0.5 if opt.size>32 else 0.0),
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    train_loaders = []
+
+    for task_id in range(opt.n_task):
+
+        target_classes = list(range(task_id*opt.cls_per_task, (task_id+1)*opt.cls_per_task))
+
+        subset_indices = []
+        subset_importance_weight = []
+
+        _train_dataset = datasets.CIFAR10(root=opt.data_folder,
+                                            transform=train_transform,
+                                            download=True)
+        
+        for tc in target_classes:
+            subset_indices += np.where(np.array(_train_dataset.targets) == tc)[0].tolist()  # cur_sample index, list
+            tc_num = (np.array(_train_dataset.targets) == tc).sum()
+            subset_importance_weight += list(np.ones(tc_num) / tc_num)
+            
+        
+
+
+        _subset_indices, _subset_importance_weight = copy.deepcopy(subset_indices), copy.deepcopy(subset_importance_weight)
+
+        train_dataset = IS_Subset(_train_dataset, _subset_indices, _subset_importance_weight)
+        bsz = int(len(train_dataset) / 5)
+        print("bsz: ", bsz)
+
+        train_loader = torch.utils.data.DataLoader(
+                            train_dataset, batch_size=bsz, shuffle=True,
+                            num_workers=opt.num_workers, pin_memory=True)
+        
+        train_loaders += [train_loader]
+
+    return train_loaders
+
+
+
+
 
 
 
@@ -276,6 +385,113 @@ def set_loader_cclis_cifar100(opt, normalize, replay_indices, method_tools, trai
         print('no separate sampler')
     
     return train_loader, subset_indices, replay_sample_num
+
+
+# ある１クラスのサンプルのみを含む検証用データローダーの作成cifar100
+def set_grad_loader_cclis_cifar100(opt, train, normalize, method_tools):
+
+    importance_weight = method_tools['importance_weight']
+
+    train_transform = transforms.Compose([
+        transforms.Resize(size=(opt.size, opt.size)),
+        transforms.RandomResizedCrop(size=opt.size, scale=(0.1 if opt.dataset=='tiny-imagenet' else 0.2, 1.)),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomApply([
+            transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
+        ], p=0.8),
+        transforms.RandomGrayscale(p=0.2),
+        transforms.RandomApply([transforms.GaussianBlur(kernel_size=opt.size//20*2+1, sigma=(0.1, 2.0))], p=0.5 if opt.size>32 else 0.0),
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    
+
+    train_loaders = []
+
+    for tc in range(opt.n_cls):
+
+        subset_indices = []
+        subset_importance_weight = []
+
+        _train_dataset = datasets.CIFAR100(root=opt.data_folder,
+                                           train=train,
+                                           transform=train_transform,
+                                           download=True)
+        
+        target_class_indices = np.where(np.array(_train_dataset.targets) == tc)[0]
+
+        subset_indices += np.where(np.array(_train_dataset.targets) == tc)[0].tolist()  # cur_sample index, list
+        tc_num = (np.array(_train_dataset.targets) == tc).sum()
+        
+        subset_importance_weight += list(np.ones(tc_num) / tc_num)  # cur_sample importance weight, list
+
+        _subset_indices, _subset_importance_weight = copy.deepcopy(subset_indices), copy.deepcopy(subset_importance_weight)
+
+        train_dataset = IS_Subset(_train_dataset, _subset_indices, _subset_importance_weight)
+        bsz = int(len(train_dataset) / 5)
+        print("bsz: ", bsz)
+
+        train_loader = torch.utils.data.DataLoader(
+                            train_dataset, batch_size=bsz, shuffle=True,
+                            num_workers=opt.num_workers, pin_memory=True)
+        
+        train_loaders += [train_loader]
+
+    return train_loaders
+
+
+
+# ある１タスクのサンプルのみを含む検証用データローダーの作成cifar100
+def set_gradtask_loader_cclis_cifar100(opt, train, normalize, method_tools):
+
+    importance_weight = method_tools['importance_weight']
+
+    train_transform = transforms.Compose([
+        transforms.Resize(size=(opt.size, opt.size)),
+        transforms.RandomResizedCrop(size=opt.size, scale=(0.1 if opt.dataset=='tiny-imagenet' else 0.2, 1.)),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomApply([
+            transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
+        ], p=0.8),
+        transforms.RandomGrayscale(p=0.2),
+        transforms.RandomApply([transforms.GaussianBlur(kernel_size=opt.size//20*2+1, sigma=(0.1, 2.0))], p=0.5 if opt.size>32 else 0.0),
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    train_loaders = []
+
+    for task_id in range(opt.n_task):
+
+        target_classes = list(range(task_id*opt.cls_per_task, (task_id+1)*opt.cls_per_task))
+
+        subset_indices = []
+        subset_importance_weight = []
+
+        _train_dataset = datasets.CIFAR100(root=opt.data_folder,
+                                           train=train,
+                                           transform=train_transform,
+                                           download=True)
+        
+        for tc in target_classes:
+            subset_indices += np.where(np.array(_train_dataset.targets) == tc)[0].tolist()  # cur_sample index, list
+            tc_num = (np.array(_train_dataset.targets) == tc).sum()
+            subset_importance_weight += list(np.ones(tc_num) / tc_num)
+
+        _subset_indices, _subset_importance_weight = copy.deepcopy(subset_indices), copy.deepcopy(subset_importance_weight)
+
+        train_dataset = IS_Subset(_train_dataset, _subset_indices, _subset_importance_weight)
+        bsz = int(len(train_dataset) / 5)
+        print("bsz: ", bsz)
+
+        train_loader = torch.utils.data.DataLoader(
+                            train_dataset, batch_size=bsz, shuffle=True,
+                            num_workers=opt.num_workers, pin_memory=True)
+        
+        train_loaders += [train_loader]
+
+    return train_loaders
 
 
 
@@ -365,5 +581,110 @@ def set_loader_cclis_tinyimagenet(opt, normalize, replay_indices, method_tools, 
     
     return train_loader, subset_indices, replay_sample_num
 
+
+
+# ある１クラスのサンプルのみを含む検証用データローダーの作成tiny-imagenet
+def set_grad_loader_cclis_tinyimagenet(opt, train, normalize, method_tools):
+
+    importance_weight = method_tools['importance_weight']
+
+    train_transform = transforms.Compose([
+        transforms.Resize(size=(opt.size, opt.size)),
+        transforms.RandomResizedCrop(size=opt.size, scale=(0.1 if opt.dataset=='tiny-imagenet' else 0.2, 1.)),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomApply([
+            transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
+        ], p=0.8),
+        transforms.RandomGrayscale(p=0.2),
+        transforms.RandomApply([transforms.GaussianBlur(kernel_size=opt.size//20*2+1, sigma=(0.1, 2.0))], p=0.5 if opt.size>32 else 0.0),
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    train_loaders = []
+
+    for tc in range(opt.n_cls):
+
+        subset_indices = []
+        subset_importance_weight = []
+
+        _train_dataset = TinyImagenet(root=opt.data_folder,
+                                      train=train,
+                                      transform=train_transform,
+                                      download=True)
+        
+        target_class_indices = np.where(np.array(_train_dataset.targets) == tc)[0]
+
+        subset_indices += np.where(np.array(_train_dataset.targets) == tc)[0].tolist()  # cur_sample index, list
+        tc_num = (np.array(_train_dataset.targets) == tc).sum()
+        
+        subset_importance_weight += list(np.ones(tc_num) / tc_num)  # cur_sample importance weight, list
+
+        _subset_indices, _subset_importance_weight = copy.deepcopy(subset_indices), copy.deepcopy(subset_importance_weight)
+
+        train_dataset = IS_Subset(_train_dataset, _subset_indices, _subset_importance_weight)
+        bsz = int(len(train_dataset) / 5)
+        print("bsz: ", bsz)
+
+        train_loader = torch.utils.data.DataLoader(
+                            train_dataset, batch_size=bsz, shuffle=True,
+                            num_workers=opt.num_workers, pin_memory=True)
+        
+        train_loaders += [train_loader]
+
+    return train_loaders
+
+
+
+# ある１クラスのサンプルのみを含む検証用データローダーの作成tiny-imagenet
+def set_gradtask_loader_cclis_tinyimagenet(opt, train, normalize, method_tools):
+
+    importance_weight = method_tools['importance_weight']
+
+    train_transform = transforms.Compose([
+        transforms.Resize(size=(opt.size, opt.size)),
+        transforms.RandomResizedCrop(size=opt.size, scale=(0.1 if opt.dataset=='tiny-imagenet' else 0.2, 1.)),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomApply([
+            transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
+        ], p=0.8),
+        transforms.RandomGrayscale(p=0.2),
+        transforms.RandomApply([transforms.GaussianBlur(kernel_size=opt.size//20*2+1, sigma=(0.1, 2.0))], p=0.5 if opt.size>32 else 0.0),
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    train_loaders = []
+
+    for task_id in range(opt.n_task):
+
+        target_classes = list(range(task_id*opt.cls_per_task, (task_id+1)*opt.cls_per_task))
+
+        subset_indices = []
+        subset_importance_weight = []
+
+        _train_dataset = TinyImagenet(root=opt.data_folder,
+                                      train=train,
+                                      transform=train_transform,
+                                      download=True)
+        
+        for tc in target_classes:
+            subset_indices += np.where(np.array(_train_dataset.targets) == tc)[0].tolist()  # cur_sample index, list
+            tc_num = (np.array(_train_dataset.targets) == tc).sum()
+            subset_importance_weight += list(np.ones(tc_num) / tc_num)
+
+        _subset_indices, _subset_importance_weight = copy.deepcopy(subset_indices), copy.deepcopy(subset_importance_weight)
+
+        train_dataset = IS_Subset(_train_dataset, _subset_indices, _subset_importance_weight)
+        bsz = int(len(train_dataset) / 5)
+        print("bsz: ", bsz)
+
+        train_loader = torch.utils.data.DataLoader(
+                            train_dataset, batch_size=bsz, shuffle=True,
+                            num_workers=opt.num_workers, pin_memory=True)
+        
+        train_loaders += [train_loader]
+
+    return train_loaders
 
 

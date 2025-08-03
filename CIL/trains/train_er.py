@@ -103,7 +103,7 @@ def grad_analysis_supcon(opt, model, optimizer, criterion, grad_train_loaders, e
 
             writer = csv.writer(f)
             if is_new_file:
-                writer.writerow(['epoch', 'class', 'layer', 'param_type', 'index', 'grad_value'])
+                writer.writerow(['current task', 'epoch', 'task', 'layer', 'param_type', 'index', 'grad_value'])
 
             for taskid, loader in enumerate(grad_train_loaders):
 
@@ -151,6 +151,7 @@ def grad_analysis_supcon(opt, model, optimizer, criterion, grad_train_loaders, e
                                 abs_sum = grad.abs().sum(dim=1)
                                 for i, g in enumerate(abs_sum):
                                     writer.writerow([
+                                        opt.target_task,  # 現在のタスク
                                         epoch,
                                         int(targets[0].item()),  # 代表クラス
                                         layer_name,
@@ -163,6 +164,7 @@ def grad_analysis_supcon(opt, model, optimizer, criterion, grad_train_loaders, e
                                 abs_sum = grad.abs().sum(dim=1)
                                 for i, g in enumerate(abs_sum):
                                     writer.writerow([
+                                        opt.target_task,  # 現在のタスク
                                         epoch,
                                         int(targets[0].item()),
                                         layer_name,
@@ -174,6 +176,7 @@ def grad_analysis_supcon(opt, model, optimizer, criterion, grad_train_loaders, e
                             elif grad.dim() == 1:  # Bias: [N]
                                 for i, g in enumerate(grad.abs()):
                                     writer.writerow([
+                                        opt.target_task,  # 現在のタスク
                                         epoch,
                                         int(targets[0].item()),
                                         layer_name,

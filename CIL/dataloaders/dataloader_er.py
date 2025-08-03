@@ -195,7 +195,7 @@ def set_gard_loader_er_cifar10(opt, train, normalize):
 
         subset_indices = []
         _val_dataset = datasets.CIFAR10(root=opt.data_folder,
-                                        train=False,
+                                        train=train,
                                         transform=val_transform)
 
         subset_indices += np.where(np.array(_val_dataset.targets) == tc)[0].tolist()
@@ -229,7 +229,7 @@ def set_gardtask_loader_er_cifar10(opt, train, normalize):
 
         subset_indices = []
         _val_dataset = datasets.CIFAR10(root=opt.data_folder,
-                                        train=False,
+                                        train=train,
                                         transform=val_transform)
 
         for tc in target_classes:
@@ -447,7 +447,7 @@ def set_gard_loader_er_cifar100(opt, train, normalize):
 
         subset_indices = []
         _val_dataset = datasets.CIFAR100(root=opt.data_folder,
-                                         train=False,
+                                         train=train,
                                          transform=train_transform)
         
         subset_indices += np.where(np.array(_val_dataset.targets) == tc)[0].tolist()
@@ -480,7 +480,7 @@ def set_gardtask_loader_er_cifar100(opt, train, normalize):
 
         subset_indices = []
         _val_dataset = datasets.CIFAR100(root=opt.data_folder,
-                                         train=False,
+                                         train=train,
                                          transform=val_transform)
 
         for tc in target_classes:
@@ -675,8 +675,6 @@ def set_taskil_valloader_er_tinyimagenet(opt, normalize):
     return val_loaders
 
 
-
-
 # ある１クラスのサンプルのみを含む検証用データローダーの作成tiny-imagenet
 def set_grad_loader_er_tinyimagenet(opt, train, normalize):
 
@@ -692,7 +690,7 @@ def set_grad_loader_er_tinyimagenet(opt, train, normalize):
 
         subset_indices = []
         _val_dataset = TinyImagenet(root=opt.data_folder,
-                                        train=False,
+                                        train=train,
                                         transform=val_transform)
 
         subset_indices += np.where(np.array(_val_dataset.targets) == tc)[0].tolist()
@@ -725,7 +723,7 @@ def set_gardtask_loader_er_tinyimagenet(opt, train, normalize):
 
         subset_indices = []
         _val_dataset = TinyImagenet(root=opt.data_folder,
-                                        train=False,
+                                        train=train,
                                         transform=val_transform)
 
 

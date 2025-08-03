@@ -165,15 +165,16 @@ def set_grad_loader_co2l_cifar10(opt, train, normalize):
 
         subset_indices = []
         _val_dataset = datasets.CIFAR10(root=opt.data_folder,
-                                        train=False,
+                                        train=train,
                                         transform=TwoCropTransform(train_transform))
 
         subset_indices += np.where(np.array(_val_dataset.targets) == tc)[0].tolist()
         val_dataset =  Subset(_val_dataset, subset_indices)
-        bsz = len(val_dataset)
+        
+        bsz = int(len(val_dataset) / 5)
         print("vak_dataset size: ", len(val_dataset))
         val_loader = torch.utils.data.DataLoader(
-            val_dataset, batch_size=bsz, shuffle=False,
+            val_dataset, batch_size=bsz, shuffle=True,
             num_workers=8, pin_memory=True)
         
         val_loaders += [val_loader]
@@ -204,17 +205,17 @@ def set_gradtask_loader_co2l_cifar10(opt, train, normalize):
 
         subset_indices = []
         _val_dataset = datasets.CIFAR10(root=opt.data_folder,
-                                        train=False,
+                                        train=train,
                                         transform=TwoCropTransform(train_transform))
 
         for tc in target_classes:
             subset_indices += np.where(np.array(_val_dataset.targets) == tc)[0].tolist()
 
         val_dataset =  Subset(_val_dataset, subset_indices)
-        bsz = len(val_dataset)
+        bsz = int(len(val_dataset) / 5)
         print("vak_dataset size: ", len(val_dataset))
         val_loader = torch.utils.data.DataLoader(
-            val_dataset, batch_size=bsz, shuffle=False,
+            val_dataset, batch_size=bsz, shuffle=True,
             num_workers=8, pin_memory=True)
         
         val_loaders += [val_loader]
@@ -382,10 +383,10 @@ def set_grad_loader_co2l_cifar100(opt, train, normalize):
 
         subset_indices += np.where(np.array(_val_dataset.targets) == tc)[0].tolist()
         val_dataset =  Subset(_val_dataset, subset_indices)
-        bsz = len(val_dataset)
+        bsz = int(len(val_dataset) / 5)
         print("vak_dataset size: ", len(val_dataset))
         val_loader = torch.utils.data.DataLoader(
-            val_dataset, batch_size=bsz, shuffle=False,
+            val_dataset, batch_size=bsz, shuffle=True,
             num_workers=8, pin_memory=True)
         
         val_loaders += [val_loader]
@@ -416,17 +417,17 @@ def set_gradtask_loader_co2l_cifar100(opt, train, normalize):
 
         subset_indices = []
         _val_dataset = datasets.CIFAR100(root=opt.data_folder,
-                                         train=False,
+                                         train=train,
                                          transform=TwoCropTransform(train_transform))
 
         for tc in target_classes:
             subset_indices += np.where(np.array(_val_dataset.targets) == tc)[0].tolist()
 
         val_dataset =  Subset(_val_dataset, subset_indices)
-        bsz = len(val_dataset)
+        bsz = int(len(val_dataset) / 5)
         print("vak_dataset size: ", len(val_dataset))
         val_loader = torch.utils.data.DataLoader(
-            val_dataset, batch_size=bsz, shuffle=False,
+            val_dataset, batch_size=bsz, shuffle=True,
             num_workers=8, pin_memory=True)
         
         val_loaders += [val_loader]
@@ -593,10 +594,10 @@ def set_grad_loader_co2l_tinyimagenet(opt, train, normalize):
 
         subset_indices += np.where(np.array(_train_dataset.targets) == tc)[0].tolist()
         val_dataset =  Subset(_train_dataset, subset_indices)
-        bsz = len(val_dataset)
+        bsz = int(len(val_dataset) / 5)
         print("vak_dataset size: ", len(val_dataset))
         val_loader = torch.utils.data.DataLoader(
-            val_dataset, batch_size=bsz, shuffle=False,
+            val_dataset, batch_size=bsz, shuffle=True,
             num_workers=8, pin_memory=True)
         
         val_loaders += [val_loader]
@@ -637,10 +638,10 @@ def set_gradtask_loader_co2l_tinyimagenet(opt, train, normalize):
             subset_indices += np.where(np.array(_val_dataset.targets) == tc)[0].tolist()
 
         val_dataset =  Subset(_val_dataset, subset_indices)
-        bsz = len(val_dataset)
+        bsz = int(len(val_dataset) / 5)
         print("vak_dataset size: ", len(val_dataset))
         val_loader = torch.utils.data.DataLoader(
-            val_dataset, batch_size=bsz, shuffle=False,
+            val_dataset, batch_size=bsz, shuffle=True,
             num_workers=8, pin_memory=True)
         
         val_loaders += [val_loader]

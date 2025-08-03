@@ -1,4 +1,7 @@
 
+import os
+import csv
+import sys
 import math
 import logging
 import numpy as np
@@ -55,7 +58,8 @@ def warmup_learning_rate(args, epoch, batch_id, total_batches, optimizer):
 
 
 
-def train_cclis(opt, model, model2, criterion, optimizer, scheduler, train_loader, epoch, subset_sample_num, score_mask):
+def train_cclis(opt, model, model2, criterion, optimizer, scheduler, train_loader, epoch, subset_sample_num, score_mask,
+                grad_train_loaders, grad_val_loaders, gradtask_train_loaders, gradtask_val_loaders):
 
     # modelをtrainモードに変更
     model.train()
@@ -201,8 +205,299 @@ def train_cclis(opt, model, model2, criterion, optimizer, scheduler, train_loade
                   'lr {lr:.5f}'.format(
                    epoch, idx + 1, len(train_loader), loss=losses, lr=current_lr))
 
+
+    # 勾配分析（訓練用）
+    if (opt.grad_analysis and epoch == opt.epochs-1) or (opt.grad_analysis and epoch % opt.grad_analysis_freq == 0):
+        grad_analysis_supcon(opt=opt, model=model, optimizer=optimizer, criterion=criterion, grad_loaders=gradtask_train_loaders, epoch=epoch,
+                             importance_weight=importance_weight, index=index, subset_sample_num=subset_sample_num, score_mask=score_mask)
+        if opt.target_task > 0:
+            grad_analysis_distill(opt, model, model2, optimizer, criterion, gradtask_train_loaders, epoch, distill_type)
+
     return losses.avg, model2
 
+
+
+
+
+def grad_analysis_supcon(opt, model, optimizer, criterion, grad_loaders, epoch, importance_weight, index, subset_sample_num, score_mask):
+
+    if (opt.grad_analysis and epoch == opt.epochs-1) or (opt.grad_analysis and epoch % opt.grad_analysis_freq == 0):
+
+        grad_log_path = f"{opt.explog_path}/gradtask_train_supcon_log.csv"
+        is_new_file = not os.path.exists(grad_log_path)
+        print("grad_log_path: ", grad_log_path)
+
+        with open(grad_log_path, mode='a', newline='') as f:
+
+            writer = csv.writer(f)
+            if is_new_file:
+                writer.writerow(['epoch', 'task', 'layer', 'param_type', 'index', 'grad_value'])
+
+            for taskid, loader in enumerate(grad_loaders):
+                
+                # 勾配を初期化
+                optimizer.zero_grad()
+                model.zero_grad()
+                
+                for (images, labels, importance_weight, index) in loader:
+
+                    if torch.cuda.is_available():
+                        images = images.cuda(non_blocking=True)
+                        labels = labels.cuda(non_blocking=True)
+                    
+                    bsz = labels.shape[0]
+
+                    # normalize the prototypes
+                    with torch.no_grad():
+                        prev_task_mask = labels < opt.target_task * opt.cls_per_task
+
+                        w = model.prototypes.weight.data.clone()
+                        w = nn.functional.normalize(w, dim=1, p=2)
+                        model.prototypes.weight.copy_(w)
+                    
+                    features, output = model(images)
+
+                    device = (torch.device('cuda')
+                            if features.is_cuda
+                            else torch.device('cpu'))
+                    
+
+                    # 現在タスクのクラス
+                    target_labels = list(range(opt.target_task*opt.cls_per_task, (opt.target_task+1)*opt.cls_per_task))
+
+                    # ISSupCon
+                    loss = criterion(output,
+                                    features, 
+                                    labels, 
+                                    importance_weight, 
+                                    index, 
+                                    target_labels=target_labels, 
+                                    sample_num=subset_sample_num, 
+                                    score_mask=score_mask)
+                    
+                    
+                    loss.backward()
+
+                # 勾配情報をカーネル単位で出力
+                for name, param in model.named_parameters():
+                    if param.requires_grad:
+
+                        param_type = name.split('.')[-1]  # パラメータのタイプ（例: weight, bias）
+                        layer_name = '.'.join(name.split('.')[:-1])  # レイヤー名
+                        grad = param.grad.detach().cpu()
+                
+
+                        if grad.dim() == 4:  # Conv: [out_ch, in_ch, kH, kW]
+                            grad = grad.view(grad.shape[0], -1)  # [out_ch, *]
+                            abs_sum = grad.abs().sum(dim=1)
+                            for i, g in enumerate(abs_sum):
+                                writer.writerow([
+                                    epoch,
+                                    int(taskid),  # タスクID
+                                    layer_name,
+                                    param_type,
+                                    str([i]),  # カーネル index
+                                    g.item()
+                                ])
+
+                        elif grad.dim() == 2:  # Linear: [out_dim, in_dim]
+                            abs_sum = grad.abs().sum(dim=1)
+                            for i, g in enumerate(abs_sum):
+                                writer.writerow([
+                                    epoch,
+                                    int(taskid),  # タスクID
+                                    layer_name,
+                                    param_type,
+                                    str([i]),  # 出力ユニット index
+                                    g.item()
+                                ])
+
+                        elif grad.dim() == 1:  # Bias: [N]
+                            for i, g in enumerate(grad.abs()):
+                                writer.writerow([
+                                    epoch,
+                                    int(taskid),  # タスクID
+                                    layer_name,
+                                    param_type,
+                                    str([i]),
+                                    g.item()
+                                ])
+
+
+
+
+
+
+def grad_analysis_distill(opt, model, model2, optimizer, criterion, grad_loaders, epoch, distill_type):
+
+    if (opt.grad_analysis and epoch == opt.epochs-1) or (opt.grad_analysis and epoch % opt.grad_analysis_freq == 0):
+
+        grad_log_path = f"{opt.explog_path}/gradtask_train_distill_log.csv"
+        is_new_file = not os.path.exists(grad_log_path)
+        print("grad_log_path: ", grad_log_path)
+
+        with open(grad_log_path, mode='a', newline='') as f:
+
+            writer = csv.writer(f)
+            if is_new_file:
+                writer.writerow(['current task', 'epoch', 'task', 'layer', 'param_type', 'index', 'grad_value'])
+
+            for taskid, loader in enumerate(grad_loaders):
+
+                # 勾配を初期化
+                optimizer.zero_grad()
+                model.zero_grad()
+
+                for (images, labels, importance_weight, index) in loader:
+
+                    if torch.cuda.is_available():
+                        images = images.cuda(non_blocking=True)
+                        labels = labels.cuda(non_blocking=True)
+                    
+                    bsz = labels.shape[0]
+
+                    # normalize the prototypes
+                    with torch.no_grad():
+                        prev_task_mask = labels < opt.target_task * opt.cls_per_task
+
+                        w = model.prototypes.weight.data.clone()
+                        w = nn.functional.normalize(w, dim=1, p=2)
+                        model.prototypes.weight.copy_(w)
+                    
+                    features, output = model(images)
+
+                    device = (torch.device('cuda')
+                            if features.is_cuda
+                            else torch.device('cpu'))
+                    
+                    # 現在タスクのクラス
+                    target_labels = list(range(opt.target_task*opt.cls_per_task, (opt.target_task+1)*opt.cls_per_task))
+
+
+                    if distill_type == 'IRD':
+                        if opt.target_task > 0:
+                            # IRD (cur)
+                            labels_mask = labels < min(target_labels)
+
+                            features1_prev_task = features[labels_mask] if IRD_type == 'prev' else features
+
+                            features1_sim = torch.div(torch.matmul(features1_prev_task, features1_prev_task.T), opt.current_temp)
+                            logits_mask = torch.scatter(
+                                torch.ones_like(features1_sim),
+                                1,
+                                torch.arange(features1_sim.size(0)).view(-1, 1).cuda(non_blocking=True),
+                                0
+                            )
+                            logits_max1, _ = torch.max(features1_sim * logits_mask, dim=1, keepdim=True)
+                            features1_sim = features1_sim - logits_max1.detach()
+                            row_size = features1_sim.size(0)
+                            logits1 = torch.exp(features1_sim[logits_mask.bool()].view(row_size, -1)) / torch.exp(features1_sim[logits_mask.bool()].view(row_size, -1)).sum(dim=1, keepdim=True)
+
+                            # IRD (past)
+                            with torch.no_grad():
+                                features2, _ = model2(images)
+                                features2_prev_task = features2[labels_mask] if IRD_type == 'prev' else features2
+
+                                features2_sim = torch.div(torch.matmul(features2_prev_task, features2_prev_task.T), opt.past_temp)
+                                logits_max2, _ = torch.max(features2_sim*logits_mask, dim=1, keepdim=True)
+                                features2_sim = features2_sim - logits_max2.detach()
+                                logits2 = torch.exp(features2_sim[logits_mask.bool()].view(row_size, -1)) /  torch.exp(features2_sim[logits_mask.bool()].view(row_size, -1)).sum(dim=1, keepdim=True)
+
+                            loss_distill = (-logits2 * torch.log(logits1)).sum(1).mean()
+                            loss = opt.distill_power * loss_distill
+                    
+                    elif distill_type == 'PRD':
+                        if opt.target_task > 0:
+                            all_labels = torch.unique(labels).view(-1, 1)
+
+                            prev_all_labels = torch.arange(target_labels[0])
+                            
+                            prototypes_mask = torch.scatter(
+                                torch.zeros(len(prev_all_labels), opt.n_cls).float(),
+                                1,
+                                prev_all_labels.view(-1,1),
+                                1
+                                ).to(device)
+
+                            labels_mask = labels < min(target_labels)
+
+                            # PRD (cur)
+                            sim_prev_task = torch.matmul(prototypes_mask, output)
+
+                            features1_sim = torch.div(sim_prev_task, opt.current_temp)
+                            
+
+                            logits_max1, _ = torch.max(features1_sim, dim=0, keepdim=True)
+                            features1_sim = features1_sim - logits_max1.detach()  # number stability
+                            row_size = features1_sim.size(0)
+                            
+                            logits1 = torch.exp(features1_sim) / torch.exp(features1_sim).sum(dim=0, keepdim=True)
+
+                            # PRD (past)
+                            with torch.no_grad():
+                                _, sim2_prev_task = model2(images)
+                                sim2_prev_task = torch.matmul(prototypes_mask, sim2_prev_task)
+
+                                features2_sim = torch.div(sim2_prev_task, opt.past_temp)
+                                logits_max2, _ = torch.max(features2_sim, dim=0, keepdim=True)
+                                features2_sim = features2_sim - logits_max2.detach()
+                                logits2 = torch.exp(features2_sim) /  torch.exp(features2_sim).sum(dim=0, keepdim=True)
+
+                            loss_distill = (-logits2 * torch.log(logits1)).sum(0).mean()
+                            loss = opt.distill_power * loss_distill
+
+                    else:
+                        raise ValueError("distill type {} is not supported".format(distill_type))
+                    
+                    loss.backward()
+
+                # 勾配情報をカーネル単位で出力
+                for name, param in model.named_parameters():
+                    if param.requires_grad:
+
+                        param_type = name.split('.')[-1]  # パラメータのタイプ（例: weight, bias）
+                        layer_name = '.'.join(name.split('.')[:-1])  # レイヤー名
+                        grad = param.grad.detach().cpu()
+                
+
+                        if grad.dim() == 4:  # Conv: [out_ch, in_ch, kH, kW]
+                            grad = grad.view(grad.shape[0], -1)  # [out_ch, *]
+                            abs_sum = grad.abs().sum(dim=1)
+                            for i, g in enumerate(abs_sum):
+                                writer.writerow([
+                                    opt.target_task,  # 現在のタスク
+                                    epoch,
+                                    int(taskid),  # タスクID
+                                    layer_name,
+                                    param_type,
+                                    str([i]),  # カーネル index
+                                    g.item()
+                                ])
+
+                        elif grad.dim() == 2:  # Linear: [out_dim, in_dim]
+                            abs_sum = grad.abs().sum(dim=1)
+                            for i, g in enumerate(abs_sum):
+                                writer.writerow([
+                                    opt.target_task,  # 現在のタスク
+                                    epoch,
+                                    int(taskid),  # タスクID
+                                    layer_name,
+                                    param_type,
+                                    str([i]),  # 出力ユニット index
+                                    g.item()
+                                ])
+
+                        elif grad.dim() == 1:  # Bias: [N]
+                            for i, g in enumerate(grad.abs()):
+                                writer.writerow([
+                                    opt.target_task,  # 現在のタスク
+                                    epoch,
+                                    int(taskid),  # タスクID
+                                    layer_name,
+                                    param_type,
+                                    str([i]),
+                                    g.item()
+                                ])
 
 
 
@@ -389,8 +684,6 @@ def taskil_val_cclis(opt, model, classifier,  criterion, val_loaders):
         print(f"[Task {taskid}] Loss: {losses.avg:.4f}, Accuracy: {task_accuracy:.2f}%")
 
     return all_task_accuracies, all_task_losses
-
-
 
 
 def ncm_cclis(model, ncm_loader, val_loader):

@@ -45,6 +45,11 @@ from dataloaders.dataloader_fsdgpm import set_loader_fsdgpm_tinyimagenet, set_va
 
 # cclis
 from dataloaders.dataloader_cclis import set_loader_cclis_cifar10, set_loader_cclis_cifar100, set_loader_cclis_tinyimagenet
+from dataloaders.dataloader_cclis import set_gradtask_loader_cclis_cifar10
+
+# 勾配解析用
+from dataloaders.dataloader_cclis import set_grad_loader_cclis_cifar10, set_grad_loader_cclis_cifar100, set_grad_loader_cclis_tinyimagenet
+from dataloaders.dataloader_cclis import set_gradtask_loader_cclis_cifar10, set_gradtask_loader_cclis_cifar100
 
 # cclis-wo-ss
 from dataloaders.dataloader_cclis_wo_ss import set_loader_cclis_wo_ss_cifar10, set_loader_cclis_wo_ss_cifar100, set_loader_cclis_wo_ss_tinyimagenet
@@ -287,7 +292,7 @@ def set_loader(opt, replay_indices, method_tools):
         elif opt.dataset == "tiny-imagenet":
             grad_train_loaders = set_grad_loader_er_tinyimagenet(opt=opt, train=True, normalize=normalize)
     
-    elif opt.method in ["cclis", "cclis-wo", "co2l", "supcon"]:
+    elif opt.method in ["co2l", "supcon"]:
 
         if opt.dataset == "cifar10":
             grad_val_loaders = set_grad_loader_co2l_cifar10(opt=opt, train=False, normalize=normalize)
@@ -302,6 +307,22 @@ def set_loader(opt, replay_indices, method_tools):
             grad_train_loaders = set_grad_loader_co2l_cifar100(opt=opt, train=True, normalize=normalize)
         elif opt.dataset == "tiny-imagenet":
             grad_train_loaders = set_grad_loader_co2l_tinyimagenet(opt=opt, train=True, normalize=normalize)
+    
+    elif opt.method in ["cclis"]:
+
+        if opt.dataset == "cifar10":
+            grad_val_loaders = set_grad_loader_cclis_cifar10(opt=opt, train=False, normalize=normalize, method_tools=method_tools)
+        elif opt.dataset == "cifar100": 
+            grad_val_loaders = set_grad_loader_cclis_cifar100(opt=opt, train=False, normalize=normalize, method_tools=method_tools)
+        elif opt.dataset == "tiny-imagenet":
+            grad_val_loaders = set_grad_loader_cclis_tinyimagenet(opt=opt, train=False, normalize=normalize, method_tools=method_tools)
+
+        if opt.dataset == "cifar10":
+            grad_train_loaders = set_grad_loader_cclis_cifar10(opt=opt, train=True, normalize=normalize, method_tools=method_tools)
+        elif opt.dataset == "cifar100":
+            grad_train_loaders = set_grad_loader_cclis_cifar100(opt=opt, train=True, normalize=normalize, method_tools=method_tools)
+        elif opt.dataset == "tiny-imagenet":
+            grad_train_loaders = set_grad_loader_cclis_tinyimagenet(opt=opt, train=True, normalize=normalize, method_tools=method_tools)
         
 
 
@@ -320,7 +341,7 @@ def set_loader(opt, replay_indices, method_tools):
             grad_train_loaders = set_gardtask_loader_er_cifar100(opt=opt, train=True, normalize=normalize)
         elif opt.dataset == "tiny-imagenet":
             grad_train_loaders = set_gardtask_loader_er_tinyimagenet(opt=opt, train=True, normalize=normalize)
-    elif opt.method in ["cclis", "cclis-wo", "co2l", "supcon"]:
+    elif opt.method in ["co2l", "supcon"]:
         
         if opt.dataset == "cifar10":
             grad_val_loaders = set_gradtask_loader_co2l_cifar10(opt=opt, train=False, normalize=normalize)
@@ -335,6 +356,24 @@ def set_loader(opt, replay_indices, method_tools):
             grad_train_loaders = set_gradtask_loader_co2l_cifar100(opt=opt, train=True, normalize=normalize)
         elif opt.dataset == "tiny-imagenet":
             grad_train_loaders = set_gradtask_loader_co2l_tinyimagenet(opt=opt, train=True, normalize=normalize)
+    
+    elif opt.method in ["cclis"]:
+        
+        if opt.dataset == "cifar10":
+            grad_val_loaders = set_gradtask_loader_cclis_cifar10(opt=opt, train=False, normalize=normalize, method_tools=method_tools)
+        elif opt.dataset == "cifar100": 
+            grad_val_loaders = set_gradtask_loader_cclis_cifar100(opt=opt, train=False, normalize=normalize, method_tools=method_tools)
+        elif opt.dataset == "tiny-imagenet":
+            grad_val_loaders = set_gradtask_loader_cclis_tinyimagenet(opt=opt, train=False, normalize=normalize, method_tools=method_tools)
+
+        if opt.dataset == "cifar10":
+            grad_train_loaders = set_gradtask_loader_cclis_cifar10(opt=opt, train=True, normalize=normalize, method_tools=method_tools)
+        elif opt.dataset == "cifar100":
+            grad_train_loaders = set_gradtask_loader_cclis_cifar100(opt=opt, train=True, normalize=normalize, method_tools=method_tools)
+        elif opt.dataset == "tiny-imagenet":
+            grad_train_loaders = set_gradtask_loader_cclis_tinyimagenet(opt=opt, train=True, normalize=normalize, method_tools=method_tools)
+
+
 
     dataloader = {"train": train_loader, "linear": linear_loader, "val": val_loader, "vanilla": vanilla_loader, "ncm": ncm_loader, "taskil": taskil_loaders,
                   "grad_train": grad_train_loaders, "grad_val": grad_val_loaders, "gradtask_train": grad_train_loaders, "gradtask_val": grad_val_loaders}

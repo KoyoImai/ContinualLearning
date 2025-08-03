@@ -95,9 +95,9 @@ def train_co2l(opt, model, model2, criterion, optimizer, scheduler, train_loader
 
     # 勾配分析（訓練用）
     if (opt.grad_analysis and epoch == opt.epochs-1) or (opt.grad_analysis and epoch % opt.grad_analysis_freq == 0):
-        grad_analysis_supcon(opt, model, optimizer, criterion, grad_train_loaders, epoch)
+        grad_analysis_supcon(opt, model, optimizer, criterion, gradtask_train_loaders, epoch)
         if opt.target_task > 0:
-            grad_analysis_distill(opt, model, model2, optimizer, criterion, grad_train_loaders, epoch)
+            grad_analysis_distill(opt, model, model2, optimizer, criterion, gradtask_train_loaders, epoch)
     
 
 
@@ -120,9 +120,13 @@ def grad_analysis_supcon(opt, model, optimizer, criterion, grad_loaders, epoch):
 
             writer = csv.writer(f)
             if is_new_file:
-                writer.writerow(['epoch', 'task', 'layer', 'param_type', 'index', 'grad_value'])
+                writer.writerow(['current task', 'epoch', 'task', 'layer', 'param_type', 'index', 'grad_value'])
 
             for taskid, loader in enumerate(grad_loaders):
+
+                # 勾配の初期化
+                optimizer.zero_grad()
+                model.zero_grad()
 
                 for (images, labels) in loader:
 
@@ -141,55 +145,57 @@ def grad_analysis_supcon(opt, model, optimizer, criterion, grad_loaders, epoch):
                     features = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1)], dim=1)
                     loss = criterion(features, labels, target_labels=list(range(opt.target_task*opt.cls_per_task, (opt.target_task+1)*opt.cls_per_task)))
 
-                    optimizer.zero_grad()
-                    model.zero_grad()
+                    
                     loss.backward()
 
                     
-                    # 勾配情報をカーネル単位で出力
-                    for name, param in model.named_parameters():
-                        if param.requires_grad:
+                # 勾配情報をカーネル単位で出力
+                for name, param in model.named_parameters():
+                    if param.requires_grad:
 
-                            param_type = name.split('.')[-1]  # パラメータのタイプ（例: weight, bias）
-                            layer_name = '.'.join(name.split('.')[:-1])  # レイヤー名
-                            grad = param.grad.detach().cpu()
-                    
+                        param_type = name.split('.')[-1]  # パラメータのタイプ（例: weight, bias）
+                        layer_name = '.'.join(name.split('.')[:-1])  # レイヤー名
+                        grad = param.grad.detach().cpu()
+                
 
-                            if grad.dim() == 4:  # Conv: [out_ch, in_ch, kH, kW]
-                                grad = grad.view(grad.shape[0], -1)  # [out_ch, *]
-                                abs_sum = grad.abs().sum(dim=1)
-                                for i, g in enumerate(abs_sum):
-                                    writer.writerow([
-                                        epoch,
-                                        int(labels[0].item()),  # 代表クラス
-                                        layer_name,
-                                        param_type,
-                                        str([i]),  # カーネル index
-                                        g.item()
-                                    ])
+                        if grad.dim() == 4:  # Conv: [out_ch, in_ch, kH, kW]
+                            grad = grad.view(grad.shape[0], -1)  # [out_ch, *]
+                            abs_sum = grad.abs().sum(dim=1)
+                            for i, g in enumerate(abs_sum):
+                                writer.writerow([
+                                    opt.target_task,  # 現在のタスク
+                                    epoch,
+                                    int(taskid),  # タスクID
+                                    layer_name,
+                                    param_type,
+                                    str([i]),  # カーネル index
+                                    g.item()
+                                ])
 
-                            elif grad.dim() == 2:  # Linear: [out_dim, in_dim]
-                                abs_sum = grad.abs().sum(dim=1)
-                                for i, g in enumerate(abs_sum):
-                                    writer.writerow([
-                                        epoch,
-                                        int(labels[0].item()),
-                                        layer_name,
-                                        param_type,
-                                        str([i]),  # 出力ユニット index
-                                        g.item()
-                                    ])
+                        elif grad.dim() == 2:  # Linear: [out_dim, in_dim]
+                            abs_sum = grad.abs().sum(dim=1)
+                            for i, g in enumerate(abs_sum):
+                                writer.writerow([
+                                    opt.target_task,  # 現在のタスク
+                                    epoch,
+                                    int(taskid),  # タスクID
+                                    layer_name,
+                                    param_type,
+                                    str([i]),  # 出力ユニット index
+                                    g.item()
+                                ])
 
-                            elif grad.dim() == 1:  # Bias: [N]
-                                for i, g in enumerate(grad.abs()):
-                                    writer.writerow([
-                                        epoch,
-                                        int(labels[0].item()),
-                                        layer_name,
-                                        param_type,
-                                        str([i]),
-                                        g.item()
-                                    ])
+                        elif grad.dim() == 1:  # Bias: [N]
+                            for i, g in enumerate(grad.abs()):
+                                writer.writerow([
+                                    opt.target_task,  # 現在のタスク
+                                    epoch,
+                                    int(taskid),  # タスクID
+                                    layer_name,
+                                    param_type,
+                                    str([i]),
+                                    g.item()
+                                ])
 
 
 
@@ -205,9 +211,13 @@ def grad_analysis_distill(opt, model, model2, optimizer, criterion, grad_loaders
 
             writer = csv.writer(f)
             if is_new_file:
-                writer.writerow(['epoch', 'task', 'layer', 'param_type', 'index', 'grad_value'])
+                writer.writerow(['current task', 'epoch', 'task', 'layer', 'param_type', 'index', 'grad_value'])
 
             for taskid, loader in enumerate(grad_loaders):
+
+                # 勾配の初期化
+                optimizer.zero_grad()
+                model.zero_grad()
 
                 for (images, labels) in loader:
 
@@ -254,56 +264,56 @@ def grad_analysis_distill(opt, model, model2, optimizer, criterion, grad_loaders
                         loss_distill = (-logits2 * torch.log(logits1)).sum(1).mean()
                         loss = opt.distill_power * loss_distill
                     
-                    
-                    optimizer.zero_grad()
-                    model.zero_grad()
                     loss.backward()
 
                     
-                    # 勾配情報をカーネル単位で出力
-                    for name, param in model.named_parameters():
-                        if param.requires_grad:
+                # 勾配情報をカーネル単位で出力
+                for name, param in model.named_parameters():
+                    if param.requires_grad:
 
-                            param_type = name.split('.')[-1]  # パラメータのタイプ（例: weight, bias）
-                            layer_name = '.'.join(name.split('.')[:-1])  # レイヤー名
-                            grad = param.grad.detach().cpu()
-                    
+                        param_type = name.split('.')[-1]  # パラメータのタイプ（例: weight, bias）
+                        layer_name = '.'.join(name.split('.')[:-1])  # レイヤー名
+                        grad = param.grad.detach().cpu()
+                
 
-                            if grad.dim() == 4:  # Conv: [out_ch, in_ch, kH, kW]
-                                grad = grad.view(grad.shape[0], -1)  # [out_ch, *]
-                                abs_sum = grad.abs().sum(dim=1)
-                                for i, g in enumerate(abs_sum):
-                                    writer.writerow([
-                                        epoch,
-                                        int(labels[0].item()),  # 代表クラス
-                                        layer_name,
-                                        param_type,
-                                        str([i]),  # カーネル index
-                                        g.item()
-                                    ])
+                        if grad.dim() == 4:  # Conv: [out_ch, in_ch, kH, kW]
+                            grad = grad.view(grad.shape[0], -1)  # [out_ch, *]
+                            abs_sum = grad.abs().sum(dim=1)
+                            for i, g in enumerate(abs_sum):
+                                writer.writerow([
+                                    opt.target_task,  # 現在のタスク
+                                    epoch,
+                                    int(taskid),  # タスクID
+                                    layer_name,
+                                    param_type,
+                                    str([i]),  # カーネル index
+                                    g.item()
+                                ])
 
-                            elif grad.dim() == 2:  # Linear: [out_dim, in_dim]
-                                abs_sum = grad.abs().sum(dim=1)
-                                for i, g in enumerate(abs_sum):
-                                    writer.writerow([
-                                        epoch,
-                                        int(labels[0].item()),
-                                        layer_name,
-                                        param_type,
-                                        str([i]),  # 出力ユニット index
-                                        g.item()
-                                    ])
+                        elif grad.dim() == 2:  # Linear: [out_dim, in_dim]
+                            abs_sum = grad.abs().sum(dim=1)
+                            for i, g in enumerate(abs_sum):
+                                writer.writerow([
+                                    opt.target_task,  # 現在のタスク
+                                    epoch,
+                                    int(taskid),  # タスクID
+                                    layer_name,
+                                    param_type,
+                                    str([i]),  # 出力ユニット index
+                                    g.item()
+                                ])
 
-                            elif grad.dim() == 1:  # Bias: [N]
-                                for i, g in enumerate(grad.abs()):
-                                    writer.writerow([
-                                        epoch,
-                                        int(labels[0].item()),
-                                        layer_name,
-                                        param_type,
-                                        str([i]),
-                                        g.item()
-                                    ])
+                        elif grad.dim() == 1:  # Bias: [N]
+                            for i, g in enumerate(grad.abs()):
+                                writer.writerow([
+                                    opt.target_task,  # 現在のタスク
+                                    epoch,
+                                    int(taskid),  # タスクID
+                                    layer_name,
+                                    param_type,
+                                    str([i]),
+                                    g.item()
+                                ])
 
 
 
