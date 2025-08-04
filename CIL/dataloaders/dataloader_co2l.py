@@ -563,7 +563,7 @@ def set_grad_loader_co2l_cifar100_v2(opt, train, normalize, replay_indices=None)
 
 
 # 現在タスクのデータ+リプレイバッファのデータを含むデータローダーを返す（基本的に訓練用データローダーを同じ）
-def set_gradreplay_loader_co2l_cifar100(opt, train, normalize, replay_indices):
+def set_gradreplay_loader_co2l_cifar100(opt, train, normalize, replay_indices=[]):
 
     train_transform = transforms.Compose([
         transforms.Resize(size=(opt.size, opt.size)),
@@ -865,7 +865,7 @@ def set_grad_loader_co2l_tinyimagenet_v2(opt, train, normalize):
     return val_loader
 
 
-def set_gradreplay_loader_co2l_tinyimagenet(opt, train, normalize, replay_indices):
+def set_gradreplay_loader_co2l_tinyimagenet(opt, train, normalize, replay_indices=[]):
 
     train_transform = transforms.Compose([
         transforms.Resize(size=(opt.size, opt.size)),

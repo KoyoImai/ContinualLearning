@@ -85,7 +85,7 @@ def train_er(opt, model, model2, criterion, optimizer, scheduler, train_loader, 
     # 勾配分析
     if (opt.grad_analysis and epoch == opt.epochs-1) or (opt.grad_analysis and epoch % opt.grad_analysis_freq == 0):
         gradreplay_analysis_ce(opt, model, optimizer, criterion, gradreplay_train_loader, epoch)
-        grad_analysis_ce(opt, model, optimizer, criterion, gradreplay_train_loader, epoch)
+        grad_analysis_ce(opt, model, optimizer, criterion, grad_train_loaders, epoch)
     
     return losses.avg, model2
 
