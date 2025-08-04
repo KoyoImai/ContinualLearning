@@ -179,7 +179,6 @@ def set_taskil_valloader_er_cifar10(opt, normalize):
     return val_loaders
 
 
-
 # ある１クラスのサンプルのみを含む検証用データローダーの作成cifar10
 def set_gard_loader_er_cifar10(opt, train, normalize):
 
@@ -245,6 +244,15 @@ def set_gardtask_loader_er_cifar10(opt, train, normalize):
         val_loaders += [val_loader]
 
     return val_loaders
+
+
+
+
+
+
+
+
+
 
 
 
