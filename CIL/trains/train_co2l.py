@@ -119,13 +119,14 @@ def train_co2l(opt, model, model2, criterion, optimizer, scheduler, train_loader
 
 
 
-
 from collections import defaultdict
 def grad_analysis_supcon(opt, model, optimizer, criterion, grad_loader, epoch):
     if not (opt.grad_analysis and (epoch == opt.epochs - 1 or epoch % opt.grad_analysis_freq == 0)):
         return
 
-    grad_log_path = f"{opt.explog_path}/gradtask_train_supcon_log.csv"
+    path = f"{opt.explog_path}/grad/task{opt.target_task}"
+    os.makedirs(path, exist_ok=True)
+    grad_log_path = f"{path}/grad_epoch{epoch}_supcon_log.csv"
     is_new_file = not os.path.exists(grad_log_path)
     print("grad_log_path: ", grad_log_path)
 
@@ -225,7 +226,9 @@ def grad_analysis_distill(opt, model, model2, optimizer, criterion, grad_loader,
     if not (opt.grad_analysis and (epoch == opt.epochs - 1 or epoch % opt.grad_analysis_freq == 0)):
         return
 
-    grad_log_path = f"{opt.explog_path}/gradtask_train_supcon_log.csv"
+    path = f"{opt.explog_path}/grad/task{opt.target_task}"
+    os.makedirs(path, exist_ok=True)
+    grad_log_path = f"{path}/grad_epoch{epoch}_distill_log.csv"
     is_new_file = not os.path.exists(grad_log_path)
     print("grad_log_path: ", grad_log_path)
 

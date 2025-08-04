@@ -387,11 +387,11 @@ def set_loader(opt, replay_indices, method_tools):
             gradreplay_val_loader = set_gradreplay_loader_er_tinyimagenet(opt=opt, train=False, normalize=normalize)
 
         if opt.dataset == "cifar10":
-            gradreplay_train_loader = set_gradreplay_loader_co2l_cifar10(opt=opt, train=True, normalize=normalize, replay_indices=replay_indices)
+            gradreplay_train_loader = set_gradreplay_loader_er_cifar10(opt=opt, train=True, normalize=normalize, replay_indices=replay_indices)
         elif opt.dataset == "cifar100":
-            gradreplay_train_loader = set_gradreplay_loader_co2l_cifar100(opt=opt, train=True, normalize=normalize, replay_indices=replay_indices)
+            gradreplay_train_loader = set_gradreplay_loader_er_cifar100(opt=opt, train=True, normalize=normalize, replay_indices=replay_indices)
         elif opt.dataset == "tiny-imagenet":
-            gradreplay_train_loader = set_gradreplay_loader_co2l_tinyimagenet(opt=opt, train=True, normalize=normalize, replay_indices=replay_indices)
+            gradreplay_train_loader = set_gradreplay_loader_er_tinyimagenet(opt=opt, train=True, normalize=normalize, replay_indices=replay_indices)
     
     elif opt.method in ["co2l", "supcon", "simclr"]:
         if opt.dataset == "cifar10":

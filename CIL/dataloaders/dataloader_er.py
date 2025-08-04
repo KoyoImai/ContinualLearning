@@ -276,7 +276,7 @@ def set_grad_loader_er_cifar10_v2(opt, train, normalize, replay_indices=None):
 
 
 # 現在タスクのデータ+リプレイバッファのデータを含むデータローダーを返す（基本的に訓練用データローダーを同じ）
-def set_gradreplay_loader_er_cifar10(opt, train, normalize, replay_indices):
+def set_gradreplay_loader_er_cifar10(opt, train, normalize, replay_indices=[]):
 
     val_transform = transforms.Compose([
         transforms.Resize(size=(opt.size, opt.size)),

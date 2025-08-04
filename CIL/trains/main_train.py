@@ -45,7 +45,8 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
 
         loss, _ = train_er(opt, model, model2, criterion, optimizer, scheduler,
                            train_loader, val_loader, grad_train_loaders, grad_val_loaders,
-                           gradtask_train_loaders, gradtask_val_loaders, epoch)
+                           gradtask_train_loaders, gradtask_val_loaders,
+                           gradreplay_train_loader=gradreplay_train_loader, gradreplay_val_loader=gradreplay_val_loader, epoch=epoch)
         classil_acc, taskil_acc = val_er(opt, model, model2, criterion,
                                          optimizer, scheduler, train_loader, val_loader, epoch)
         ncm_acc = ncm_er(model, ncm_loader, val_loader)
