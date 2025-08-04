@@ -72,7 +72,7 @@ class ISSupConLoss(nn.Module):
         return score_mat, batch_score_sum
 
 
-    def forward(self, output, features, labels=None, importance_weight=None, index=None, target_labels=None, sample_num=None, mask=None, score_mask=None, all_labels = None):
+    def forward(self, output, features, labels=None, importance_weight=None, index=None, target_labels=None, sample_num=None, mask=None, score_mask=None, all_labels = None, reduction='mean'):
         assert target_labels is not None and len(target_labels) > 0, "Target labels should be given as a list of integer"
 
         """
@@ -133,7 +133,8 @@ class ISSupConLoss(nn.Module):
                 raise ValueError('Num of labels does not match num of features')
             
             # 重複ラベルを削除して，1次元ベクトルに変換
-            all_labels = torch.unique(labels).view(-1, 1).to(device)   
+            all_labels = torch.unique(labels).view(-1, 1).to(device)
+            # print("all_labels.shape: ", all_labels.shape)  # all_labels.shape:  torch.Size([2, 1])
             
             # マスクの作成
             mask = torch.eq(all_labels, labels.T).float().to(device)
@@ -229,9 +230,12 @@ class ISSupConLoss(nn.Module):
         _logits = logits - torch.log(_importance_weight) * all_mask
         # print("_logits.shape: ", _logits.shape)    # _logits.shape:  torch.Size([2, 512])
         log_prob = logits - torch.log(torch.exp(_logits).sum(1, keepdim=True))  # normalize
+        # print("log_prob.shape: ", log_prob.shape)  # log_prob.shape:  torch.Size([2, 512])
 
-        IS_supcon_loss = - (log_prob * mask).sum() / mask.sum()
-        
-        # assert False
+        if reduction == "mean":
+            IS_supcon_loss = - (log_prob * mask).sum() / mask.sum()
+        elif reduction == "grad_analysis":
+            IS_supcon_loss = - (log_prob * mask).sum(0) / mask.sum(0)
+            # print("IS_supcon_loss.shape: ", IS_supcon_loss.shape)  # IS_supcon_loss.shape:  torch.Size([512])
 
         return IS_supcon_loss

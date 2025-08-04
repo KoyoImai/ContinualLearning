@@ -19,8 +19,6 @@ logger = logging.getLogger(__name__)
 
 
 
-
-
 def adjust_learning_rate_cclis(args, optimizer, epoch):
     lr_enc = args.learning_rate
     lr_prot = args.learning_rate_prototypes
@@ -43,7 +41,6 @@ def adjust_learning_rate_cclis(args, optimizer, epoch):
         param_group['lr'] = lr_list[idx]
 
 
-
 def warmup_learning_rate(args, epoch, batch_id, total_batches, optimizer):
     if args.warm and epoch <= args.warm_epochs:
         p = (batch_id + (epoch - 1) * total_batches) / \
@@ -58,8 +55,11 @@ def warmup_learning_rate(args, epoch, batch_id, total_batches, optimizer):
 
 
 
-def train_cclis(opt, model, model2, criterion, optimizer, scheduler, train_loader, epoch, subset_sample_num, score_mask,
-                grad_train_loaders, grad_val_loaders, gradtask_train_loaders, gradtask_val_loaders):
+
+
+
+def train_cclis(opt, model, model2, criterion, optimizer, scheduler, train_loader, epoch, subset_sample_num, score_mask, grad_train_loaders, grad_val_loaders,
+                gradtask_train_loaders, gradtask_val_loaders, gradreplay_train_loader, gradreplay_val_loader):
 
     # modelをtrainモードに変更
     model.train()
@@ -105,7 +105,9 @@ def train_cclis(opt, model, model2, criterion, optimizer, scheduler, train_loade
                          index, 
                          target_labels=target_labels, 
                          sample_num=subset_sample_num, 
-                         score_mask=score_mask)
+                         score_mask=score_mask,
+                         reduction='mean',
+                         )
 
         if distill_type == 'IRD':
             if opt.target_task > 0:
@@ -208,10 +210,10 @@ def train_cclis(opt, model, model2, criterion, optimizer, scheduler, train_loade
 
     # 勾配分析（訓練用）
     if (opt.grad_analysis and epoch == opt.epochs-1) or (opt.grad_analysis and epoch % opt.grad_analysis_freq == 0):
-        grad_analysis_supcon(opt=opt, model=model, optimizer=optimizer, criterion=criterion, grad_loaders=gradtask_train_loaders, epoch=epoch,
-                             importance_weight=importance_weight, index=index, subset_sample_num=subset_sample_num, score_mask=score_mask)
-        if opt.target_task > 0:
-            grad_analysis_distill(opt, model, model2, optimizer, criterion, gradtask_train_loaders, epoch, distill_type)
+        grad_analysis_is_supcon(opt=opt, model=model, optimizer=optimizer, criterion=criterion, grad_loader=gradreplay_train_loader, epoch=epoch,
+                                importance_weight=importance_weight, index=index, subset_sample_num=subset_sample_num, score_mask=score_mask)
+        # if opt.target_task > 0:
+        #     grad_analysis_distill(opt, model, model2, optimizer, criterion, gradtask_train_loaders, epoch, distill_type)
 
     return losses.avg, model2
 
@@ -219,109 +221,234 @@ def train_cclis(opt, model, model2, criterion, optimizer, scheduler, train_loade
 
 
 
-def grad_analysis_supcon(opt, model, optimizer, criterion, grad_loaders, epoch, importance_weight, index, subset_sample_num, score_mask):
 
-    if (opt.grad_analysis and epoch == opt.epochs-1) or (opt.grad_analysis and epoch % opt.grad_analysis_freq == 0):
 
-        grad_log_path = f"{opt.explog_path}/gradtask_train_supcon_log.csv"
-        is_new_file = not os.path.exists(grad_log_path)
-        print("grad_log_path: ", grad_log_path)
 
-        with open(grad_log_path, mode='a', newline='') as f:
+from collections import defaultdict
+def grad_analysis_is_supcon(opt, model, optimizer, criterion, grad_loader, epoch, importance_weight, index, subset_sample_num, score_mask):
+    if not (opt.grad_analysis and (epoch == opt.epochs - 1 or epoch % opt.grad_analysis_freq == 0)):
+        return
 
-            writer = csv.writer(f)
-            if is_new_file:
-                writer.writerow(['epoch', 'task', 'layer', 'param_type', 'index', 'grad_value'])
+    grad_log_path = f"{opt.explog_path}/gradtask_train_issupcon_log.csv"
+    is_new_file = not os.path.exists(grad_log_path)
+    print("grad_log_path: ", grad_log_path)
 
-            for taskid, loader in enumerate(grad_loaders):
+    grad_sum_dict = defaultdict(float)
+    grad_count_dict = defaultdict(int)
+
+    for (images, labels, importance_weight, index) in grad_loader:
+        
+        if torch.cuda.is_available():
+            images = images.cuda(non_blocking=True)
+            labels = labels.cuda(non_blocking=True)
+        bsz = labels.shape[0]
+
+        # normalize the prototypes
+        with torch.no_grad():
+            prev_task_mask = labels < opt.target_task * opt.cls_per_task
+
+            w = model.prototypes.weight.data.clone()
+            w = nn.functional.normalize(w, dim=1, p=2)
+            model.prototypes.weight.copy_(w)
+
+        features, output = model(images)
+
+        # 現在タスクのクラス
+        target_labels = list(range(opt.target_task*opt.cls_per_task, (opt.target_task+1)*opt.cls_per_task))
+
+        # ISSupCon
+        loss = criterion(output,
+                        features, 
+                        labels, 
+                        importance_weight, 
+                        index, 
+                        target_labels=target_labels, 
+                        sample_num=subset_sample_num, 
+                        score_mask=score_mask,
+                        reduction='grad_analysis',
+                        )
+        # print("loss.shape: ", loss.shape)  # loss.shape:  torch.Size([500]) <-- バッチサイズ
+
+        # ラベルごとに index をまとめる
+        label_to_indices = defaultdict(list)
+        for i in range(bsz):
+            label = labels[i].item()
+            label_to_indices[label].append(i)
+
+
+
+        for label_i, indices in label_to_indices.items():
+            # 指定ラベルの損失を平均して backward
+            # loss_i = loss_tensor[:, indices].mean()
+            loss_i = loss[indices].sum()
+            optimizer.zero_grad()
+            model.zero_grad()
+            loss_i.backward(retain_graph=True)
+
+            for name, param in model.named_parameters():
+                if not param.requires_grad:
+                    continue
+
+                param_type = name.split('.')[-1]
+                layer_name = '.'.join(name.split('.')[:-1])
+                grad = param.grad.detach().cpu()
+
+                if grad.dim() == 4:
+                    grad = grad.view(grad.shape[0], -1)
+                    abs_sum = grad.abs().sum(dim=1)
+                    for j, g in enumerate(abs_sum):
+                        key = (label_i, layer_name, param_type, str([j]))
+                        grad_sum_dict[key] += g.item()
+                        grad_count_dict[key] += 1
+
+                elif grad.dim() == 2:
+                    abs_sum = grad.abs().sum(dim=1)
+                    for j, g in enumerate(abs_sum):
+                        key = (label_i, layer_name, param_type, str([j]))
+                        grad_sum_dict[key] += g.item()
+                        grad_count_dict[key] += 1
+
+                elif grad.dim() == 1:
+                    for j, g in enumerate(grad.abs()):
+                        key = (label_i, layer_name, param_type, str([j]))
+                        grad_sum_dict[key] += g.item()
+                        grad_count_dict[key] += 1
+
+
+    #  最終的に平均値をCSVに書き出し
+    with open(grad_log_path, mode='a', newline='') as f:
+        writer = csv.writer(f)
+        if is_new_file:
+            writer.writerow(['current task', 'epoch', 'anchor_label', 'layer', 'param_type', 'index', 'grad_sum', 'grad_mean'])
+
+        for key, grad_sum in grad_sum_dict.items():
+            count = grad_count_dict[key]
+            # grad_mean = grad_sum / count if count > 0 else 0.0
+            grad_mean = grad_sum / len(grad_loader.dataset)
+            label_i, layer_name, param_type, index_str = key
+            writer.writerow([
+                opt.target_task,
+                epoch,
+                label_i,
+                layer_name,
+                param_type,
+                index_str,
+                grad_sum,
+                grad_mean
+            ])
+
+
+
+
+
+
+
+
+
+
+# def grad_analysis_supcon(opt, model, optimizer, criterion, grad_loaders, epoch, importance_weight, index, subset_sample_num, score_mask):
+
+#     if (opt.grad_analysis and epoch == opt.epochs-1) or (opt.grad_analysis and epoch % opt.grad_analysis_freq == 0):
+
+#         grad_log_path = f"{opt.explog_path}/gradtask_train_supcon_log.csv"
+#         is_new_file = not os.path.exists(grad_log_path)
+#         print("grad_log_path: ", grad_log_path)
+
+#         with open(grad_log_path, mode='a', newline='') as f:
+
+#             writer = csv.writer(f)
+#             if is_new_file:
+#                 writer.writerow(['epoch', 'task', 'layer', 'param_type', 'index', 'grad_value'])
+
+#             for taskid, loader in enumerate(grad_loaders):
                 
-                # 勾配を初期化
-                optimizer.zero_grad()
-                model.zero_grad()
+#                 # 勾配を初期化
+#                 optimizer.zero_grad()
+#                 model.zero_grad()
                 
-                for (images, labels, importance_weight, index) in loader:
+#                 for (images, labels, importance_weight, index) in loader:
 
-                    if torch.cuda.is_available():
-                        images = images.cuda(non_blocking=True)
-                        labels = labels.cuda(non_blocking=True)
+#                     if torch.cuda.is_available():
+#                         images = images.cuda(non_blocking=True)
+#                         labels = labels.cuda(non_blocking=True)
                     
-                    bsz = labels.shape[0]
+#                     bsz = labels.shape[0]
 
-                    # normalize the prototypes
-                    with torch.no_grad():
-                        prev_task_mask = labels < opt.target_task * opt.cls_per_task
+#                     # normalize the prototypes
+#                     with torch.no_grad():
+#                         prev_task_mask = labels < opt.target_task * opt.cls_per_task
 
-                        w = model.prototypes.weight.data.clone()
-                        w = nn.functional.normalize(w, dim=1, p=2)
-                        model.prototypes.weight.copy_(w)
+#                         w = model.prototypes.weight.data.clone()
+#                         w = nn.functional.normalize(w, dim=1, p=2)
+#                         model.prototypes.weight.copy_(w)
                     
-                    features, output = model(images)
+#                     features, output = model(images)
 
-                    device = (torch.device('cuda')
-                            if features.is_cuda
-                            else torch.device('cpu'))
+#                     device = (torch.device('cuda')
+#                             if features.is_cuda
+#                             else torch.device('cpu'))
                     
 
-                    # 現在タスクのクラス
-                    target_labels = list(range(opt.target_task*opt.cls_per_task, (opt.target_task+1)*opt.cls_per_task))
+#                     # 現在タスクのクラス
+#                     target_labels = list(range(opt.target_task*opt.cls_per_task, (opt.target_task+1)*opt.cls_per_task))
 
-                    # ISSupCon
-                    loss = criterion(output,
-                                    features, 
-                                    labels, 
-                                    importance_weight, 
-                                    index, 
-                                    target_labels=target_labels, 
-                                    sample_num=subset_sample_num, 
-                                    score_mask=score_mask)
+#                     # ISSupCon
+#                     loss = criterion(output,
+#                                     features, 
+#                                     labels, 
+#                                     importance_weight, 
+#                                     index, 
+#                                     target_labels=target_labels, 
+#                                     sample_num=subset_sample_num, 
+#                                     score_mask=score_mask)
                     
                     
-                    loss.backward()
+#                     loss.backward()
 
-                # 勾配情報をカーネル単位で出力
-                for name, param in model.named_parameters():
-                    if param.requires_grad:
+#                 # 勾配情報をカーネル単位で出力
+#                 for name, param in model.named_parameters():
+#                     if param.requires_grad:
 
-                        param_type = name.split('.')[-1]  # パラメータのタイプ（例: weight, bias）
-                        layer_name = '.'.join(name.split('.')[:-1])  # レイヤー名
-                        grad = param.grad.detach().cpu()
+#                         param_type = name.split('.')[-1]  # パラメータのタイプ（例: weight, bias）
+#                         layer_name = '.'.join(name.split('.')[:-1])  # レイヤー名
+#                         grad = param.grad.detach().cpu()
                 
 
-                        if grad.dim() == 4:  # Conv: [out_ch, in_ch, kH, kW]
-                            grad = grad.view(grad.shape[0], -1)  # [out_ch, *]
-                            abs_sum = grad.abs().sum(dim=1)
-                            for i, g in enumerate(abs_sum):
-                                writer.writerow([
-                                    epoch,
-                                    int(taskid),  # タスクID
-                                    layer_name,
-                                    param_type,
-                                    str([i]),  # カーネル index
-                                    g.item()
-                                ])
+#                         if grad.dim() == 4:  # Conv: [out_ch, in_ch, kH, kW]
+#                             grad = grad.view(grad.shape[0], -1)  # [out_ch, *]
+#                             abs_sum = grad.abs().sum(dim=1)
+#                             for i, g in enumerate(abs_sum):
+#                                 writer.writerow([
+#                                     epoch,
+#                                     int(taskid),  # タスクID
+#                                     layer_name,
+#                                     param_type,
+#                                     str([i]),  # カーネル index
+#                                     g.item()
+#                                 ])
 
-                        elif grad.dim() == 2:  # Linear: [out_dim, in_dim]
-                            abs_sum = grad.abs().sum(dim=1)
-                            for i, g in enumerate(abs_sum):
-                                writer.writerow([
-                                    epoch,
-                                    int(taskid),  # タスクID
-                                    layer_name,
-                                    param_type,
-                                    str([i]),  # 出力ユニット index
-                                    g.item()
-                                ])
+#                         elif grad.dim() == 2:  # Linear: [out_dim, in_dim]
+#                             abs_sum = grad.abs().sum(dim=1)
+#                             for i, g in enumerate(abs_sum):
+#                                 writer.writerow([
+#                                     epoch,
+#                                     int(taskid),  # タスクID
+#                                     layer_name,
+#                                     param_type,
+#                                     str([i]),  # 出力ユニット index
+#                                     g.item()
+#                                 ])
 
-                        elif grad.dim() == 1:  # Bias: [N]
-                            for i, g in enumerate(grad.abs()):
-                                writer.writerow([
-                                    epoch,
-                                    int(taskid),  # タスクID
-                                    layer_name,
-                                    param_type,
-                                    str([i]),
-                                    g.item()
-                                ])
+#                         elif grad.dim() == 1:  # Bias: [N]
+#                             for i, g in enumerate(grad.abs()):
+#                                 writer.writerow([
+#                                     epoch,
+#                                     int(taskid),  # タスクID
+#                                     layer_name,
+#                                     param_type,
+#                                     str([i]),
+#                                     g.item()
+#                                 ])
 
 
 

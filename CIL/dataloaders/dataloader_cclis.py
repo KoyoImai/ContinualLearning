@@ -192,7 +192,6 @@ def set_loader_cclis_cifar10(opt, normalize, replay_indices, method_tools, train
     return train_loader, subset_indices, replay_sample_num
 
 
-
 # ある１クラスのサンプルのみを含む検証用データローダーの作成cifar10
 def set_grad_loader_cclis_cifar10(opt, train, normalize, method_tools):
 
@@ -296,6 +295,190 @@ def set_gradtask_loader_cclis_cifar10(opt, train, normalize, method_tools):
         train_loaders += [train_loader]
 
     return train_loaders
+
+
+
+# 全てのサンプルを含んだデータローダーを返す
+def set_grad_loader_cclis_cifar10_v2(opt, normalize, replay_indices, method_tools, training=True):
+
+    importance_weight = method_tools['importance_weight']
+
+    train_transform = transforms.Compose([
+        transforms.Resize(size=(opt.size, opt.size)),
+        transforms.RandomResizedCrop(size=opt.size, scale=(0.1 if opt.dataset=='tiny-imagenet' else 0.2, 1.)),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomApply([
+            transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
+        ], p=0.8),
+        transforms.RandomGrayscale(p=0.2),
+        transforms.RandomApply([transforms.GaussianBlur(kernel_size=opt.size//20*2+1, sigma=(0.1, 2.0))], p=0.5 if opt.size>32 else 0.0),
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    target_classes = list(range(opt.target_task*opt.cls_per_task, (opt.target_task+1)*opt.cls_per_task))
+    print('target_classes', target_classes)
+
+    # 
+    subset_indices = []
+    subset_importance_weight = []
+
+    _train_dataset = datasets.CIFAR10(root=opt.data_folder,
+                                      train=training,
+                                      transform=train_transform,
+                                      download=True)
+    
+    for tc in target_classes:
+        target_class_indices = np.where(np.array(_train_dataset.targets) == tc)[0]
+        subset_indices += np.where(np.array(_train_dataset.targets) == tc)[0].tolist()  # cur_sample index, list
+        tc_num = (np.array(_train_dataset.targets) == tc).sum()
+        
+        subset_importance_weight += list(np.ones(tc_num) / tc_num)  # cur_sample importance weight, list
+
+    _subset_indices, _subset_importance_weight = copy.deepcopy(subset_indices), copy.deepcopy(subset_importance_weight)
+
+    if len(replay_indices) > 0 and training:
+        prev_dataset = IS_Subset(_train_dataset, replay_indices, importance_weight)
+        cur_dataset = IS_Subset(_train_dataset, _subset_indices, _subset_importance_weight)
+
+        dataset_len_list = [len(prev_dataset), len(cur_dataset)]
+
+        train_dataset = ConcatDataset([prev_dataset, cur_dataset])
+
+    else:
+        _subset_indices += replay_indices
+        _subset_importance_weight += importance_weight
+
+        train_dataset = IS_Subset(_train_dataset, _subset_indices, _subset_importance_weight)
+
+    subset_indices += replay_indices
+    subset_importance_weight += importance_weight
+
+    uk, uc = np.unique(np.array(_train_dataset.targets)[subset_indices], return_counts=True)  
+    print('uc[np.argsort(uk)]', uc[np.argsort(uk)])
+    replay_sample_num = uc[np.argsort(uk)]
+
+
+    if len(replay_indices) > 0 and training: 
+        train_batch_size_list = [int(np.round(opt.batch_size * dataset_len_list[0] / sum(dataset_len_list))), 
+                                 opt.batch_size - int(np.round(opt.batch_size * dataset_len_list[0] / sum(dataset_len_list)))]
+        
+        print('train_batch_size', train_batch_size_list)
+        train_sampler = BatchSchedulerSampler(dataset=train_dataset, batch_size=train_batch_size_list)
+        print('len_data', [len(cur_dataset) for cur_dataset in train_sampler.dataset.datasets])
+    else:
+        train_sampler = None
+        
+    if training:
+        train_loader = torch.utils.data.DataLoader(
+                            train_dataset, batch_size=opt.batch_size, shuffle=(train_sampler is None),
+                            num_workers=opt.num_workers, pin_memory=True, sampler=train_sampler)
+
+
+    else:
+        train_loader = torch.utils.data.DataLoader(
+                            train_dataset, batch_size=opt.batch_size, shuffle=False,
+                            num_workers=opt.num_workers, pin_memory=True)
+        print('no separate sampler')
+    
+    return None
+
+
+# 現在タスクのデータ+リプレイバッファのデータを含むデータローダーを返す（基本的に訓練用データローダーを同じ）
+def set_gradreplay_loader_cclis_cifar10(opt, normalize, replay_indices, method_tools, training=True):
+
+    importance_weight = method_tools['importance_weight']
+
+    train_transform = transforms.Compose([
+        transforms.Resize(size=(opt.size, opt.size)),
+        transforms.RandomResizedCrop(size=opt.size, scale=(0.1 if opt.dataset=='tiny-imagenet' else 0.2, 1.)),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomApply([
+            transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
+        ], p=0.8),
+        transforms.RandomGrayscale(p=0.2),
+        transforms.RandomApply([transforms.GaussianBlur(kernel_size=opt.size//20*2+1, sigma=(0.1, 2.0))], p=0.5 if opt.size>32 else 0.0),
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    target_classes = list(range(opt.target_task*opt.cls_per_task, (opt.target_task+1)*opt.cls_per_task))
+    print('target_classes', target_classes)
+
+    # 
+    subset_indices = []
+    subset_importance_weight = []
+
+    _train_dataset = datasets.CIFAR10(root=opt.data_folder,
+                                      train=training,
+                                      transform=train_transform,
+                                      download=True)
+    
+    for tc in target_classes:
+        target_class_indices = np.where(np.array(_train_dataset.targets) == tc)[0]
+        subset_indices += np.where(np.array(_train_dataset.targets) == tc)[0].tolist()  # cur_sample index, list
+        tc_num = (np.array(_train_dataset.targets) == tc).sum()
+        
+        subset_importance_weight += list(np.ones(tc_num) / tc_num)  # cur_sample importance weight, list
+
+    _subset_indices, _subset_importance_weight = copy.deepcopy(subset_indices), copy.deepcopy(subset_importance_weight)
+
+    if len(replay_indices) > 0 and training:
+        prev_dataset = IS_Subset(_train_dataset, replay_indices, importance_weight)
+        cur_dataset = IS_Subset(_train_dataset, _subset_indices, _subset_importance_weight)
+
+        dataset_len_list = [len(prev_dataset), len(cur_dataset)]
+
+        train_dataset = ConcatDataset([prev_dataset, cur_dataset])
+
+    else:
+        _subset_indices += replay_indices
+        _subset_importance_weight += importance_weight
+
+        train_dataset = IS_Subset(_train_dataset, _subset_indices, _subset_importance_weight)
+
+    subset_indices += replay_indices
+    subset_importance_weight += importance_weight
+
+    uk, uc = np.unique(np.array(_train_dataset.targets)[subset_indices], return_counts=True)  
+    print('uc[np.argsort(uk)]', uc[np.argsort(uk)])
+    replay_sample_num = uc[np.argsort(uk)]
+
+
+    if len(replay_indices) > 0 and training: 
+        train_batch_size_list = [int(np.round(opt.batch_size * dataset_len_list[0] / sum(dataset_len_list))), 
+                                 opt.batch_size - int(np.round(opt.batch_size * dataset_len_list[0] / sum(dataset_len_list)))]
+        
+        print('train_batch_size', train_batch_size_list)
+        train_sampler = BatchSchedulerSampler(dataset=train_dataset, batch_size=train_batch_size_list)
+        print('len_data', [len(cur_dataset) for cur_dataset in train_sampler.dataset.datasets])
+    else:
+        train_sampler = None
+        
+    if training:
+        train_loader = torch.utils.data.DataLoader(
+                            train_dataset, batch_size=500, shuffle=(train_sampler is None),
+                            num_workers=opt.num_workers, pin_memory=True, sampler=train_sampler)
+
+
+    else:
+        train_loader = torch.utils.data.DataLoader(
+                            train_dataset, batch_size=500, shuffle=False,
+                            num_workers=opt.num_workers, pin_memory=True)
+        print('no separate sampler')
+    
+    return train_loader
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -494,6 +677,102 @@ def set_gradtask_loader_cclis_cifar100(opt, train, normalize, method_tools):
     return train_loaders
 
 
+# 現在タスクのデータ+リプレイバッファのデータを含むデータローダーを返す（基本的に訓練用データローダーを同じ）
+def set_gradreplay_loader_cclis_cifar100(opt, normalize, replay_indices, method_tools, training=True):
+
+    importance_weight = method_tools['importance_weight']
+
+    train_transform = transforms.Compose([
+        transforms.Resize(size=(opt.size, opt.size)),
+        transforms.RandomResizedCrop(size=opt.size, scale=(0.1 if opt.dataset=='tiny-imagenet' else 0.2, 1.)),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomApply([
+            transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
+        ], p=0.8),
+        transforms.RandomGrayscale(p=0.2),
+        transforms.RandomApply([transforms.GaussianBlur(kernel_size=opt.size//20*2+1, sigma=(0.1, 2.0))], p=0.5 if opt.size>32 else 0.0),
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    target_classes = list(range(opt.target_task*opt.cls_per_task, (opt.target_task+1)*opt.cls_per_task))
+    print('target_classes', target_classes)
+
+    # 
+    subset_indices = []
+    subset_importance_weight = []
+
+    _train_dataset = datasets.CIFAR100(root=opt.data_folder,
+                                       train=training,
+                                       transform=train_transform,
+                                       download=True)
+    
+    for tc in target_classes:
+        target_class_indices = np.where(np.array(_train_dataset.targets) == tc)[0]
+        subset_indices += np.where(np.array(_train_dataset.targets) == tc)[0].tolist()  # cur_sample index, list
+        tc_num = (np.array(_train_dataset.targets) == tc).sum()
+        
+        subset_importance_weight += list(np.ones(tc_num) / tc_num)  # cur_sample importance weight, list
+
+    _subset_indices, _subset_importance_weight = copy.deepcopy(subset_indices), copy.deepcopy(subset_importance_weight)
+
+    if len(replay_indices) > 0 and training:
+        prev_dataset = IS_Subset(_train_dataset, replay_indices, importance_weight)
+        cur_dataset = IS_Subset(_train_dataset, _subset_indices, _subset_importance_weight)
+
+        dataset_len_list = [len(prev_dataset), len(cur_dataset)]
+
+        train_dataset = ConcatDataset([prev_dataset, cur_dataset])
+
+    else:
+        _subset_indices += replay_indices
+        _subset_importance_weight += importance_weight
+
+        train_dataset = IS_Subset(_train_dataset, _subset_indices, _subset_importance_weight)
+
+    subset_indices += replay_indices
+    subset_importance_weight += importance_weight
+
+    uk, uc = np.unique(np.array(_train_dataset.targets)[subset_indices], return_counts=True)  
+    print('uc[np.argsort(uk)]', uc[np.argsort(uk)])
+    replay_sample_num = uc[np.argsort(uk)]
+
+
+    if len(replay_indices) > 0 and training: 
+        train_batch_size_list = [int(np.round(opt.batch_size * dataset_len_list[0] / sum(dataset_len_list))), 
+                                 opt.batch_size - int(np.round(opt.batch_size * dataset_len_list[0] / sum(dataset_len_list)))]
+        
+        print('train_batch_size', train_batch_size_list)
+        train_sampler = BatchSchedulerSampler(dataset=train_dataset, batch_size=train_batch_size_list)
+        print('len_data', [len(cur_dataset) for cur_dataset in train_sampler.dataset.datasets])
+    else:
+        train_sampler = None
+        
+    if training:
+        train_loader = torch.utils.data.DataLoader(
+                            train_dataset, batch_size=500, shuffle=(train_sampler is None),
+                            num_workers=opt.num_workers, pin_memory=True, sampler=train_sampler)
+
+
+    else:
+        train_loader = torch.utils.data.DataLoader(
+                            train_dataset, batch_size=500, shuffle=False,
+                            num_workers=opt.num_workers, pin_memory=True)
+        print('no separate sampler')
+    
+    return train_loader
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -686,5 +965,94 @@ def set_gradtask_loader_cclis_tinyimagenet(opt, train, normalize, method_tools):
         train_loaders += [train_loader]
 
     return train_loaders
+
+
+
+# 現在タスクのデータ+リプレイバッファのデータを含むデータローダーを返す（基本的に訓練用データローダーを同じ）
+def set_gradreplay_loader_cclis_tinyimagenet(opt, normalize, replay_indices, method_tools, training=True):
+
+    importance_weight = method_tools['importance_weight']
+
+    train_transform = transforms.Compose([
+        transforms.Resize(size=(opt.size, opt.size)),
+        transforms.RandomResizedCrop(size=opt.size, scale=(0.1 if opt.dataset=='tiny-imagenet' else 0.2, 1.)),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomApply([
+            transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
+        ], p=0.8),
+        transforms.RandomGrayscale(p=0.2),
+        transforms.RandomApply([transforms.GaussianBlur(kernel_size=opt.size//20*2+1, sigma=(0.1, 2.0))], p=0.5 if opt.size>32 else 0.0),
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    target_classes = list(range(opt.target_task*opt.cls_per_task, (opt.target_task+1)*opt.cls_per_task))
+    print('target_classes', target_classes)
+
+    subset_indices = []
+    subset_importance_weight = []
+    _train_dataset = TinyImagenet(root=opt.data_folder,
+                                        transform=train_transform,
+                                        download=True)
+    for tc in target_classes:
+        target_class_indices = np.where(_train_dataset.targets == tc)[0]
+        subset_indices += np.where(_train_dataset.targets == tc)[0].tolist()
+        tc_num = (np.array(_train_dataset.targets) == tc).sum()
+        
+        subset_importance_weight += list(np.ones(tc_num) / tc_num)  # cur_sample importance weight, list
+
+    _subset_indices, _subset_importance_weight = copy.deepcopy(subset_indices), copy.deepcopy(subset_importance_weight)
+
+    if len(replay_indices) > 0 and training:
+        prev_dataset = IS_Subset(_train_dataset, replay_indices, importance_weight)
+        cur_dataset = IS_Subset(_train_dataset, _subset_indices, _subset_importance_weight)
+
+        dataset_len_list = [len(prev_dataset), len(cur_dataset)]
+
+        train_dataset = ConcatDataset([prev_dataset, cur_dataset])
+
+    else:
+        _subset_indices += replay_indices
+        _subset_importance_weight += importance_weight
+        print('_subset_indices length', len(_subset_indices))
+        train_dataset = IS_Subset(_train_dataset, _subset_indices, _subset_importance_weight)
+
+    subset_indices += replay_indices
+    subset_importance_weight += importance_weight
+
+    print('dataset length', len(_train_dataset), len(train_dataset))
+    print('Dataset size: {}'.format(len(subset_indices)))
+
+    uk, uc = np.unique(np.array(_train_dataset.targets)[subset_indices], return_counts=True)  
+    print('uc[np.argsort(uk)]', uc[np.argsort(uk)])
+    replay_sample_num = uc[np.argsort(uk)]
+
+    if len(replay_indices) > 0 and training: 
+        train_batch_size_list = [int(np.round(opt.batch_size * dataset_len_list[0] / sum(dataset_len_list))), 
+                                 opt.batch_size - int(np.round(opt.batch_size * dataset_len_list[0] / sum(dataset_len_list)))]
+        
+        print('train_batch_size', train_batch_size_list)
+        train_sampler = BatchSchedulerSampler(dataset=train_dataset, batch_size=train_batch_size_list)
+        print('len_data', [len(cur_dataset) for cur_dataset in train_sampler.dataset.datasets])
+    else:
+        train_sampler = None
+        
+    if training:
+        train_loader = torch.utils.data.DataLoader(
+                            train_dataset, batch_size=500, shuffle=(train_sampler is None),
+                            num_workers=opt.num_workers, pin_memory=True, sampler=train_sampler)
+
+
+    else:
+        train_loader = torch.utils.data.DataLoader(
+                            train_dataset, batch_size=500, shuffle=False,
+                            num_workers=opt.num_workers, pin_memory=True)
+        print('no separate sampler')
+    
+    return train_loader, subset_indices, replay_sample_num
+
+
+
+
 
 

@@ -144,7 +144,8 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
                                    subset_sample_num=subset_sample_num, score_mask=score_mask,
                                    scheduler=scheduler, train_loader=train_loader, epoch=epoch,
                                    grad_train_loaders=grad_train_loaders, grad_val_loaders=grad_val_loaders,
-                                   gradtask_train_loaders=gradtask_train_loaders, gradtask_val_loaders=gradtask_val_loaders)
+                                   gradtask_train_loaders=gradtask_train_loaders, gradtask_val_loaders=gradtask_val_loaders,
+                                   gradreplay_train_loader=gradreplay_train_loader, gradreplay_val_loader=gradreplay_val_loader)
         if epoch % 50 == 0:
             classil_acc, taskil_acc, all_task_accuracies, all_task_losses = val_cclis(opt, model, model2, linear_loader, val_loader, taskil_loaders, epoch)
             # 各タスクの精度を「task0 acc=100.00, task1 acc=90.00」の形式で整形
