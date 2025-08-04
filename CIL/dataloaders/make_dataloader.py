@@ -13,7 +13,8 @@ from dataloaders.dataloader_er import set_taskil_valloader_er_cifar10, set_taski
 # 勾配解析用
 from dataloaders.dataloader_er import set_gard_loader_er_cifar10, set_gard_loader_er_cifar100, set_grad_loader_er_tinyimagenet
 from dataloaders.dataloader_er import set_gardtask_loader_er_cifar10, set_gardtask_loader_er_cifar100, set_gardtask_loader_er_tinyimagenet
-
+from dataloaders.dataloader_er import set_grad_loader_er_cifar10_v2, set_grad_loader_er_cifar100_v2, set_grad_loader_er_tinyimagenet_v2
+from dataloaders.dataloader_er import set_gradreplay_loader_er_cifar10, set_gradreplay_loader_er_cifar100, set_gradreplay_loader_er_tinyimagenet
 
 
 # co2l
@@ -378,29 +379,43 @@ def set_loader(opt, replay_indices, method_tools):
 
     # 現在タスクのデータ＋リプレイバッファ内のデータを含むデータローダーを返す
     if opt.method in ["er"]:
-        assert False
-    elif opt.method in ["co2l", "supcon", "simclr"]:
         if opt.dataset == "cifar10":
-            gradreplay_val_loaders = set_gradreplay_loader_co2l_cifar10(opt=opt, train=False, normalize=normalize, replay_indices=replay_indices)
+            gradreplay_val_loader = set_gradreplay_loader_er_cifar10(opt=opt, train=False, normalize=normalize)
         elif opt.dataset == "cifar100": 
-            gradreplay_val_loaders = set_gradreplay_loader_co2l_cifar100(opt=opt, train=False, normalize=normalize, replay_indices=replay_indices)
+            gradreplay_val_loader = set_gradreplay_loader_er_cifar100(opt=opt, train=False, normalize=normalize)
         elif opt.dataset == "tiny-imagenet":
-            gradreplay_val_loaders = set_gradreplay_loader_co2l_tinyimagenet(opt=opt, train=False, normalize=normalize, replay_indices=replay_indices)
+            gradreplay_val_loader = set_gradreplay_loader_er_tinyimagenet(opt=opt, train=False, normalize=normalize)
 
         if opt.dataset == "cifar10":
-            gradreplay_train_loaders = set_gradreplay_loader_co2l_cifar10(opt=opt, train=True, normalize=normalize, replay_indices=replay_indices)
+            gradreplay_train_loader = set_gradreplay_loader_co2l_cifar10(opt=opt, train=True, normalize=normalize, replay_indices=replay_indices)
         elif opt.dataset == "cifar100":
-            gradreplay_train_loaders = set_gradreplay_loader_co2l_cifar100(opt=opt, train=True, normalize=normalize, replay_indices=replay_indices)
+            gradreplay_train_loader = set_gradreplay_loader_co2l_cifar100(opt=opt, train=True, normalize=normalize, replay_indices=replay_indices)
         elif opt.dataset == "tiny-imagenet":
-            gradreplay_train_loaders = set_gradreplay_loader_co2l_tinyimagenet(opt=opt, train=True, normalize=normalize, replay_indices=replay_indices)
+            gradreplay_train_loader = set_gradreplay_loader_co2l_tinyimagenet(opt=opt, train=True, normalize=normalize, replay_indices=replay_indices)
     
-    print("len(gradreplay_val_loaders): ", len(gradreplay_val_loaders))
-    print("len(gradreplay_train_loaders): ", len(gradreplay_train_loaders))
-    assert False
+    elif opt.method in ["co2l", "supcon", "simclr"]:
+        if opt.dataset == "cifar10":
+            gradreplay_val_loader = set_gradreplay_loader_co2l_cifar10(opt=opt, train=False, normalize=normalize)
+        elif opt.dataset == "cifar100": 
+            gradreplay_val_loader = set_gradreplay_loader_co2l_cifar100(opt=opt, train=False, normalize=normalize)
+        elif opt.dataset == "tiny-imagenet":
+            gradreplay_val_loader = set_gradreplay_loader_co2l_tinyimagenet(opt=opt, train=False, normalize=normalize)
+
+        if opt.dataset == "cifar10":
+            gradreplay_train_loader = set_gradreplay_loader_co2l_cifar10(opt=opt, train=True, normalize=normalize, replay_indices=replay_indices)
+        elif opt.dataset == "cifar100":
+            gradreplay_train_loader = set_gradreplay_loader_co2l_cifar100(opt=opt, train=True, normalize=normalize, replay_indices=replay_indices)
+        elif opt.dataset == "tiny-imagenet":
+            gradreplay_train_loader = set_gradreplay_loader_co2l_tinyimagenet(opt=opt, train=True, normalize=normalize, replay_indices=replay_indices)
+    
+
+    # print("len(gradreplay_val_loaders): ", len(gradreplay_val_loaders))
+    # print("len(gradreplay_train_loaders): ", len(gradreplay_train_loaders))
 
 
     dataloader = {"train": train_loader, "linear": linear_loader, "val": val_loader, "vanilla": vanilla_loader, "ncm": ncm_loader, "taskil": taskil_loaders,
-                  "grad_train": grad_train_loaders, "grad_val": grad_val_loaders, "gradtask_train": grad_train_loaders, "gradtask_val": grad_val_loaders}
+                  "grad_train": grad_train_loaders, "grad_val": grad_val_loaders, "gradtask_train": grad_train_loaders, "gradtask_val": grad_val_loaders,
+                  "gradreplay_train": gradreplay_train_loader, "gradreplay_val": gradreplay_val_loader}
 
 
     
