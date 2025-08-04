@@ -124,7 +124,7 @@ def grad_analysis_supcon(opt, model, optimizer, criterion, grad_loader, epoch):
     if not (opt.grad_analysis and (epoch == opt.epochs - 1 or epoch % opt.grad_analysis_freq == 0)):
         return
 
-    path = f"{opt.explog_path}/grad/task{opt.target_task}"
+    path = f"{opt.explog_path}/gradreplay/task{opt.target_task}"
     os.makedirs(path, exist_ok=True)
     grad_log_path = f"{path}/grad_epoch{epoch}_supcon_log.csv"
     is_new_file = not os.path.exists(grad_log_path)
@@ -226,7 +226,7 @@ def grad_analysis_distill(opt, model, model2, optimizer, criterion, grad_loader,
     if not (opt.grad_analysis and (epoch == opt.epochs - 1 or epoch % opt.grad_analysis_freq == 0)):
         return
 
-    path = f"{opt.explog_path}/grad/task{opt.target_task}"
+    path = f"{opt.explog_path}/gradreplay/task{opt.target_task}"
     os.makedirs(path, exist_ok=True)
     grad_log_path = f"{path}/grad_epoch{epoch}_distill_log.csv"
     is_new_file = not os.path.exists(grad_log_path)

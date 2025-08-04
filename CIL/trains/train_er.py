@@ -83,7 +83,9 @@ def train_er(opt, model, model2, criterion, optimizer, scheduler, train_loader, 
                    epoch, idx + 1, len(train_loader), loss=losses, top1=np.sum(corr)/np.sum(cnt)*100., task_il=correct_task/np.sum(cnt)*100., lr=current_lr))
         
     # 勾配分析
-    gradreplay_analysis_ce(opt, model, optimizer, criterion, gradreplay_train_loader, epoch)
+    if (opt.grad_analysis and epoch == opt.epochs-1) or (opt.grad_analysis and epoch % opt.grad_analysis_freq == 0):
+        gradreplay_analysis_ce(opt, model, optimizer, criterion, gradreplay_train_loader, epoch)
+        grad_analysis_ce(opt, model, optimizer, criterion, gradreplay_train_loader, epoch)
     
     return losses.avg, model2
 
@@ -94,7 +96,7 @@ def gradreplay_analysis_ce(opt, model, optimizer, criterion, grad_loader, epoch)
     if not (opt.grad_analysis and (epoch == opt.epochs - 1 or epoch % opt.grad_analysis_freq == 0)):
         return
 
-    path = f"{opt.explog_path}/grad/task{opt.target_task}"
+    path = f"{opt.explog_path}/gradreplay/task{opt.target_task}"
     os.makedirs(path, exist_ok=True)
     grad_log_path = f"{path}/grad_epoch{epoch}_ce_log.csv"
     is_new_file = not os.path.exists(grad_log_path)
@@ -189,7 +191,9 @@ def grad_analysis_ce(opt, model, optimizer, criterion, grad_train_loaders, epoch
 
     if (opt.grad_analysis and epoch == opt.epochs-1) or (opt.grad_analysis and epoch % opt.grad_analysis_freq == 0):
 
-        grad_log_path = f"{opt.explog_path}/grad_train_log.csv"
+        path = f"{opt.explog_path}/grad/task{opt.target_task}"
+        os.makedirs(path, exist_ok=True)
+        grad_log_path = f"{path}/grad_epoch{epoch}_ce_log.csv"
         is_new_file = not os.path.exists(grad_log_path)
         print("grad_log_path: ", grad_log_path)
 
