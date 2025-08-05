@@ -206,7 +206,7 @@ def grad_analysis_supcon(opt, model, optimizer, criterion, grad_loader, epoch):
         for key, grad_sum in grad_sum_dict.items():
             count = grad_count_dict[key]
             # grad_mean = grad_sum / count if count > 0 else 0.0
-            grad_mean = grad_sum / 2*len(grad_loader.dataset)
+            grad_mean = grad_sum / (2*len(grad_loader.dataset))
             label_i, layer_name, param_type, index_str = key
             writer.writerow([
                 opt.target_task,

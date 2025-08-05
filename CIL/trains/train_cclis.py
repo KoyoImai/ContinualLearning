@@ -229,7 +229,9 @@ def grad_analysis_is_supcon(opt, model, optimizer, criterion, grad_loader, epoch
     if not (opt.grad_analysis and (epoch == opt.epochs - 1 or epoch % opt.grad_analysis_freq == 0)):
         return
 
-    grad_log_path = f"{opt.explog_path}/gradtask_train_issupcon_log.csv"
+    path = f"{opt.explog_path}/gradreplay/task{opt.target_task}"
+    os.makedirs(path, exist_ok=True)
+    grad_log_path = f"{path}/grad_epoch{epoch}_issupcon_log.csv"
     is_new_file = not os.path.exists(grad_log_path)
     print("grad_log_path: ", grad_log_path)
 
