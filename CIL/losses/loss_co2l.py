@@ -118,7 +118,7 @@ class SupConLoss(nn.Module):
         # 非対称教師あり対照損失のため，過去クラスを除外
         if not self.not_asym:
             loss = curr_class_mask * loss.view(anchor_count, batch_size)
-            # print("loss.shape: ", loss.shape)      # loss.shape:  torch.Size([2, 512])
+            # print("loss.shape: ", loss.shape) 
         else:
             loss = loss.view(anchor_count, batch_size)
 
