@@ -10,12 +10,13 @@ https://github.com/HobbitLong/SupContrast/blob/master/losses.py
 class SupConLoss(nn.Module):
 
     def __init__(self, temperature=0.07, contrast_mode='all',
-                 base_temperature=0.07):
+                 base_temperature=0.07, not_asym=False):
         super(SupConLoss, self).__init__()
 
         self.temperature = temperature    
         self.contrast_mode = contrast_mode 
         self.base_temperature = base_temperature
+        self.not_asym = not_asym
 
     def forward(self, features, labels=None, mask=None, target_labels=None, reduction='mean'):
         assert target_labels is not None and len(target_labels) > 0, "Target labels should be given as a list of integer"
@@ -106,16 +107,20 @@ class SupConLoss(nn.Module):
 
         # loss
         loss = - (self.temperature / self.base_temperature) * mean_log_prob_pos
-        # print("loss.shape: ", loss.shape)  # loss.shape:  torch.Size([1024])d
+        # print("loss.shape: ", loss.shape)  # loss.shape:  torch.Size([1024])
 
-        # 非対称教師あり対照損失のため，過去クラスを除外
+        
         curr_class_mask = torch.zeros_like(labels)
         for tc in target_labels:
             curr_class_mask += (labels == tc)
         curr_class_mask = curr_class_mask.view(-1).to(device)
         
-        loss = curr_class_mask * loss.view(anchor_count, batch_size)
-        # print("loss.shape: ", loss.shape)      # loss.shape:  torch.Size([2, 512])   # loss.shape:  torch.Size([])
+        # 非対称教師あり対照損失のため，過去クラスを除外
+        if not self.not_asym:
+            loss = curr_class_mask * loss.view(anchor_count, batch_size)
+            # print("loss.shape: ", loss.shape)      # loss.shape:  torch.Size([2, 512])
+        else:
+            loss = loss.view(anchor_count, batch_size)
 
         if reduction == 'mean':
             loss = loss.mean()

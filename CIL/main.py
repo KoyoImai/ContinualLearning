@@ -81,6 +81,7 @@ def parse_option():
     parser.add_argument('--current_temp', type=float, default=0.2)
     parser.add_argument('--past_temp', type=float, default=0.1)
     parser.add_argument('--distill_power', type=float, default=0.1)
+    parser.add_argument('--not_asym', default=False, action='store_true')
 
     # 手法毎のハイパラ（gpm & fs-dgpm）
     parser.add_argument('--threshold', type=float, default=0.965)
@@ -239,7 +240,7 @@ def make_setup(opt):
         
         model = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed)
         model2 = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed)
-        criterion = SupConLoss(temperature=opt.temp)
+        criterion = SupConLoss(temperature=opt.temp, not_asym=opt.not_asym)
         optimizer = optim.SGD(model.parameters(),
                                 lr=opt.learning_rate,
                                 momentum=opt.momentum,
