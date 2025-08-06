@@ -166,7 +166,7 @@ def gradreplay_analysis_ce(opt, model, optimizer, criterion, grad_loader, epoch)
     with open(grad_log_path, mode='a', newline='') as f:
         writer = csv.writer(f)
         if is_new_file:
-            writer.writerow(['current task', 'epoch', 'label', 'layer', 'param_type', 'index', 'grad_mean'])
+            writer.writerow(['current task', 'epoch', 'label', 'layer', 'param_type', 'index', 'grad_sum', 'grad_mean'])
 
         for key, grad_sum in grad_sum_dict.items():
             count = grad_count_dict[key]
