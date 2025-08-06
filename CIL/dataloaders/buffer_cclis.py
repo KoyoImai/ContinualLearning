@@ -66,8 +66,13 @@ def set_replay_samples_cclis(opt, prev_indices=None, prev_importance_weight=None
         prev_indices, prev_importance_weight = [], []
         observed_classes = list(range(0, opt.target_task*opt.cls_per_task))
     else:
+
+        # 縮小サイズ（過去タスクのデータに割り当てれるメモリ）
         shrink_size = ((opt.target_task - 1) * opt.mem_size / opt.target_task)
+        
+        
         if len(prev_indices) > 0:
+
             unique_cls = np.unique(val_targets[prev_indices])
             _prev_indices = prev_indices
             prev_indices_len = len(prev_indices)
@@ -75,6 +80,7 @@ def set_replay_samples_cclis(opt, prev_indices=None, prev_importance_weight=None
             prev_weight = prev_importance_weight 
             prev_importance_weight = []
 
+            # 1クラスずつ処理
             for c in unique_cls:
                 mask = val_targets[_prev_indices] == c
 
@@ -122,9 +128,14 @@ def set_replay_samples_cclis(opt, prev_indices=None, prev_importance_weight=None
 
         # 特定クラスcのみを取り出すためのマスク
         mask = val_targets[observed_indices] == c
+
+        # この下2行をコメントアウトしたら，さらに下の「store_index=〜」のコメントアウトを変更
+        scores = torch.tensor(prev_score[prev_indices_len:])[mask]
+        size_for_c = min(size_for_c, len(scores))  # エラー防止
         
         # prev_scoreをもとにサンプル毎に重みづけをして保存するサンプルを選択
-        store_index = torch.multinomial(torch.tensor(prev_score[prev_indices_len:])[mask], size_for_c, replacement=False)
+        # store_index = torch.multinomial(torch.tensor(prev_score[prev_indices_len:])[mask], size_for_c, replacement=False)
+        store_index = torch.multinomial(scores, size_for_c, replacement=False)
 
         # 選択されたサンプルのインデックスを蓄積
         selected_observed_indices += torch.tensor(observed_indices)[mask][store_index].tolist()
