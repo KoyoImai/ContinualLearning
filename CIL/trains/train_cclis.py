@@ -224,121 +224,672 @@ def train_cclis(opt, model, model2, criterion, optimizer, scheduler, train_loade
 
 
 
-
+import pandas as pd
 from collections import defaultdict
+import pandas as pd
+from collections import defaultdict
+
+def write_full_grad_to_csv_by_column_from_list(grad_raw_list, output_path, epoch):
+    df_raw = pd.DataFrame(grad_raw_list, columns=["anchor_label", "layer", "param_type", "index", "grad_value"])
+    df_grouped = df_raw.groupby(["anchor_label", "layer", "param_type", "index"], as_index=False)["grad_value"].mean()
+    df_grouped.rename(columns={"grad_value": f"epoch_{epoch}"}, inplace=True)
+
+    if os.path.exists(output_path):
+        df_old = pd.read_csv(output_path)
+        df_merged = pd.merge(df_old, df_grouped, on=["anchor_label", "layer", "param_type", "index"], how="outer")
+    else:
+        df_merged = df_grouped
+
+    df_merged.to_csv(output_path, index=False)
+
+# === 勾配記録対象のフィルタ関数 ===
+def should_record_grad(layer_name, param_type, index_tuple):
+    if param_type != "weight":
+        return False
+    if "bn" in layer_name or "shortcut" in layer_name or "downsample" in layer_name:
+        return False
+    if index_tuple and index_tuple[0] >= 5:  # 例: 先頭5チャネルのみ
+        return False
+    return True
+
 def grad_analysis_is_supcon(opt, model, optimizer, criterion, grad_loader, epoch, importance_weight, index, subset_sample_num, score_mask):
     if not (opt.grad_analysis and (epoch == opt.epochs - 1 or epoch % opt.grad_analysis_freq == 0)):
         return
 
     path = f"{opt.explog_path}/gradreplay/task{opt.target_task}"
     os.makedirs(path, exist_ok=True)
+
     grad_log_path = f"{path}/grad_epoch{epoch}_issupcon_log.csv"
-    is_new_file = not os.path.exists(grad_log_path)
-    print("grad_log_path: ", grad_log_path)
+    full_grad_log_path = f"{path}/grad_epochall_issupcon_full.csv"
+    is_new_log_file = not os.path.exists(grad_log_path)
 
     grad_sum_dict = defaultdict(float)
     grad_count_dict = defaultdict(int)
 
+    grad_raw_list = []
+
     for (images, labels, importance_weight, index) in grad_loader:
-        
         if torch.cuda.is_available():
             images = images.cuda(non_blocking=True)
             labels = labels.cuda(non_blocking=True)
+        
+        print("len(images): ", len(images))
+
         bsz = labels.shape[0]
 
-        # normalize the prototypes
         with torch.no_grad():
-            prev_task_mask = labels < opt.target_task * opt.cls_per_task
-
             w = model.prototypes.weight.data.clone()
             w = nn.functional.normalize(w, dim=1, p=2)
             model.prototypes.weight.copy_(w)
 
         features, output = model(images)
+        target_labels = list(range(opt.target_task * opt.cls_per_task,
+                                   (opt.target_task + 1) * opt.cls_per_task))
 
-        # 現在タスクのクラス
-        target_labels = list(range(opt.target_task*opt.cls_per_task, (opt.target_task+1)*opt.cls_per_task))
+        loss = criterion(output, features, labels, importance_weight, index,
+                         target_labels=target_labels,
+                         sample_num=subset_sample_num,
+                         score_mask=score_mask,
+                         reduction='grad_analysis')
 
-        # ISSupCon
-        loss = criterion(output,
-                        features, 
-                        labels, 
-                        importance_weight, 
-                        index, 
-                        target_labels=target_labels, 
-                        sample_num=subset_sample_num, 
-                        score_mask=score_mask,
-                        reduction='grad_analysis',
-                        )
-        # print("loss.shape: ", loss.shape)  # loss.shape:  torch.Size([500]) <-- バッチサイズ
-
-        # ラベルごとに index をまとめる
         label_to_indices = defaultdict(list)
         for i in range(bsz):
             label = labels[i].item()
             label_to_indices[label].append(i)
 
-
-
         for label_i, indices in label_to_indices.items():
-            # 指定ラベルの損失を平均して backward
-            # loss_i = loss_tensor[:, indices].mean()
             loss_i = loss[indices].sum()
             optimizer.zero_grad()
             model.zero_grad()
             loss_i.backward(retain_graph=True)
 
             for name, param in model.named_parameters():
-                if not param.requires_grad:
+                if not param.requires_grad or param.grad is None:
                     continue
 
                 param_type = name.split('.')[-1]
                 layer_name = '.'.join(name.split('.')[:-1])
                 grad = param.grad.detach().cpu()
 
+                # === 集計用（ノルム） ===
                 if grad.dim() == 4:
-                    grad = grad.view(grad.shape[0], -1)
-                    abs_sum = grad.abs().sum(dim=1)
+                    grad_reshaped = grad.view(grad.shape[0], -1)
+                    abs_sum = grad_reshaped.abs().sum(dim=1)
                     for j, g in enumerate(abs_sum):
                         key = (label_i, layer_name, param_type, str([j]))
                         grad_sum_dict[key] += g.item()
                         grad_count_dict[key] += 1
-
                 elif grad.dim() == 2:
                     abs_sum = grad.abs().sum(dim=1)
                     for j, g in enumerate(abs_sum):
                         key = (label_i, layer_name, param_type, str([j]))
                         grad_sum_dict[key] += g.item()
                         grad_count_dict[key] += 1
-
                 elif grad.dim() == 1:
                     for j, g in enumerate(grad.abs()):
                         key = (label_i, layer_name, param_type, str([j]))
                         grad_sum_dict[key] += g.item()
                         grad_count_dict[key] += 1
 
+                # === 詳細記録用（リストに追加） ===
+                for index_tuple in np.ndindex(grad.shape):
+                    if not should_record_grad(layer_name, param_type, index_tuple):
+                        continue
+                    grad_value = grad[index_tuple].item()
+                    grad_raw_list.append([
+                        label_i, layer_name, param_type, str(list(index_tuple)), grad_value
+                    ])
 
-    #  最終的に平均値をCSVに書き出し
+    # === ノルムのCSV出力（従来形式） ===
     with open(grad_log_path, mode='a', newline='') as f:
         writer = csv.writer(f)
-        if is_new_file:
+        if is_new_log_file:
             writer.writerow(['current task', 'epoch', 'anchor_label', 'layer', 'param_type', 'index', 'grad_sum', 'grad_mean'])
-
         for key, grad_sum in grad_sum_dict.items():
-            count = grad_count_dict[key]
-            # grad_mean = grad_sum / count if count > 0 else 0.0
             grad_mean = grad_sum / len(grad_loader.dataset)
             label_i, layer_name, param_type, index_str = key
-            writer.writerow([
-                opt.target_task,
-                epoch,
-                label_i,
-                layer_name,
-                param_type,
-                index_str,
-                grad_sum,
-                grad_mean
-            ])
+            writer.writerow([opt.target_task, epoch, label_i, layer_name, param_type, index_str, grad_sum, grad_mean])
+
+    # === 詳細勾配を一括平均してCSV保存 ===
+    write_full_grad_to_csv_by_column_from_list(grad_raw_list, full_grad_log_path, epoch)
+
+
+
+
+
+# def write_full_grad_to_csv_by_column_from_sums(grad_sum_dict, grad_count_dict, output_path, epoch):
+#     rows = []
+#     for key in grad_sum_dict:
+#         grad_mean = grad_sum_dict[key] / grad_count_dict[key]
+#         anchor_label, layer, param_type, index_str = key
+#         rows.append([anchor_label, layer, param_type, index_str, grad_mean])
+    
+#     df_new = pd.DataFrame(rows, columns=["anchor_label", "layer", "param_type", "index", f"epoch_{epoch}"])
+
+#     if os.path.exists(output_path):
+#         df_old = pd.read_csv(output_path)
+#         df_merged = pd.merge(df_old, df_new, on=["anchor_label", "layer", "param_type", "index"], how="outer")
+#     else:
+#         df_merged = df_new
+
+#     df_merged.to_csv(output_path, index=False)
+
+
+# # === 勾配記録対象のフィルタ関数 ===
+# def should_record_grad(layer_name, param_type, index_tuple):
+#     if param_type != "weight":
+#         return False
+#     if "bn" in layer_name or "shortcut" in layer_name or "downsample" in layer_name:
+#         return False
+#     if index_tuple and index_tuple[0] >= 5:  # 例: 先頭5チャネルのみ
+#         return False
+#     return True
+
+# def grad_analysis_is_supcon(opt, model, optimizer, criterion, grad_loader, epoch, importance_weight, index, subset_sample_num, score_mask):
+#     if not (opt.grad_analysis and (epoch == opt.epochs - 1 or epoch % opt.grad_analysis_freq == 0)):
+#         return
+
+#     path = f"{opt.explog_path}/gradreplay/task{opt.target_task}"
+#     os.makedirs(path, exist_ok=True)
+
+#     grad_log_path = f"{path}/grad_epoch{epoch}_issupcon_log.csv"
+#     full_grad_log_path = f"{path}/grad_epochall_issupcon_full.csv"
+#     is_new_log_file = not os.path.exists(grad_log_path)
+
+#     grad_sum_dict = defaultdict(float)
+#     grad_count_dict = defaultdict(int)
+
+#     grad_raw_sum_dict = defaultdict(float)
+#     grad_raw_count_dict = defaultdict(int)
+
+#     print("→ grad_log_path:", grad_log_path)
+#     print("→ full_grad_log_path:", full_grad_log_path)
+
+#     for (images, labels, importance_weight, index) in grad_loader:
+#         if torch.cuda.is_available():
+#             images = images.cuda(non_blocking=True)
+#             labels = labels.cuda(non_blocking=True)
+
+#         print("len(index): ", len(index))
+
+#         bsz = labels.shape[0]
+
+#         with torch.no_grad():
+#             w = model.prototypes.weight.data.clone()
+#             w = nn.functional.normalize(w, dim=1, p=2)
+#             model.prototypes.weight.copy_(w)
+
+#         features, output = model(images)
+#         target_labels = list(range(opt.target_task * opt.cls_per_task,
+#                                    (opt.target_task + 1) * opt.cls_per_task))
+
+#         loss = criterion(output, features, labels, importance_weight, index,
+#                          target_labels=target_labels,
+#                          sample_num=subset_sample_num,
+#                          score_mask=score_mask,
+#                          reduction='grad_analysis')
+
+#         label_to_indices = defaultdict(list)
+#         for i in range(bsz):
+#             label = labels[i].item()
+#             label_to_indices[label].append(i)
+
+#         for label_i, indices in label_to_indices.items():
+#             loss_i = loss[indices].sum()
+#             optimizer.zero_grad()
+#             model.zero_grad()
+#             loss_i.backward(retain_graph=True)
+
+#             for name, param in model.named_parameters():
+#                 if not param.requires_grad or param.grad is None:
+#                     continue
+
+#                 param_type = name.split('.')[-1]
+#                 layer_name = '.'.join(name.split('.')[:-1])
+#                 grad = param.grad.detach().cpu()
+
+#                 # === 集計用（ノルム） ===
+#                 if grad.dim() == 4:
+#                     grad_reshaped = grad.view(grad.shape[0], -1)
+#                     abs_sum = grad_reshaped.abs().sum(dim=1)
+#                     for j, g in enumerate(abs_sum):
+#                         key = (label_i, layer_name, param_type, str([j]))
+#                         grad_sum_dict[key] += g.item()
+#                         grad_count_dict[key] += 1
+#                 elif grad.dim() == 2:
+#                     abs_sum = grad.abs().sum(dim=1)
+#                     for j, g in enumerate(abs_sum):
+#                         key = (label_i, layer_name, param_type, str([j]))
+#                         grad_sum_dict[key] += g.item()
+#                         grad_count_dict[key] += 1
+#                 elif grad.dim() == 1:
+#                     for j, g in enumerate(grad.abs()):
+#                         key = (label_i, layer_name, param_type, str([j]))
+#                         grad_sum_dict[key] += g.item()
+#                         grad_count_dict[key] += 1
+
+#                 # # === 詳細記録用（平均集計） ===
+#                 # print("grad.shape: ", grad.shape)
+#                 # for index_tuple in np.ndindex(grad.shape):
+#                 #     # print("index_tuple: ", index_tuple)
+#                 #     grad_value = grad[index_tuple].item()
+#                 #     # print("grad_value: ", grad_value)
+#                 #     key = (label_i, layer_name, param_type, str(list(index_tuple)))
+#                 #     grad_raw_sum_dict[key] += grad_value
+#                 #     grad_raw_count_dict[key] += 1
+                
+#                 # for index_tuple in np.ndindex(grad.shape):
+#                 #     if not should_record_grad(layer_name, param_type, index_tuple):
+#                 #         continue
+#                 #     grad_value = grad[index_tuple].item()
+#                 #     key = (label_i, layer_name, param_type, str(list(index_tuple)))
+#                 #     grad_raw_sum_dict[key] += grad_value
+#                 #     grad_raw_count_dict[key] += 1
+
+#                 # === 詳細記録（キーを高速化） ===
+#                 prefix = f"{label_i}|{layer_name}|{param_type}"
+#                 for index_tuple in np.ndindex(grad.shape):
+#                     if not should_record_grad(layer_name, param_type, index_tuple):
+#                         continue
+#                     index_str = '|'.join(map(str, index_tuple))
+#                     key = f"{prefix}|{index_str}"
+#                     grad_raw_sum_dict[key] += grad[index_tuple].item()
+#                     grad_raw_count_dict[key] += 1
+
+
+#     # === ノルムのCSV出力（従来形式） ===
+#     with open(grad_log_path, mode='a', newline='') as f:
+#         writer = csv.writer(f)
+#         if is_new_log_file:
+#             writer.writerow(['current task', 'epoch', 'anchor_label', 'layer', 'param_type', 'index', 'grad_sum', 'grad_mean'])
+
+#         for key, grad_sum in grad_sum_dict.items():
+#             count = grad_count_dict[key]
+#             grad_mean = grad_sum / len(grad_loader.dataset)
+#             label_i, layer_name, param_type, index_str = key
+#             writer.writerow([opt.target_task, epoch, label_i, layer_name, param_type, index_str, grad_sum, grad_mean])
+
+#     # === 詳細勾配を列追加形式で出力 ===
+#     write_full_grad_to_csv_by_column_from_sums(grad_raw_sum_dict, grad_raw_count_dict, full_grad_log_path, epoch)
+
+
+
+
+
+# def write_full_grad_to_csv(grad_raw_dict, output_path, epoch, task_id):
+#     is_new_file = not os.path.exists(output_path)
+#     with open(output_path, mode='a', newline='') as f:
+#         writer = csv.writer(f)
+#         if is_new_file:
+#             writer.writerow(['current task', 'epoch', 'anchor_label', 'layer', 'param_type', 'index', 'grad_value'])
+
+#         for key, grad_values in grad_raw_dict.items():
+#             label_i, layer_name, param_type, index_str = key
+#             for g in grad_values:
+#                 writer.writerow([task_id, epoch, label_i, layer_name, param_type, index_str, g])
+
+# def grad_analysis_is_supcon(opt, model, optimizer, criterion, grad_loader, epoch, importance_weight, index, subset_sample_num, score_mask):
+#     if not (opt.grad_analysis and (epoch == opt.epochs - 1 or epoch % opt.grad_analysis_freq == 0)):
+#         return
+
+#     path = f"{opt.explog_path}/gradreplay/task{opt.target_task}"
+#     os.makedirs(path, exist_ok=True)
+
+#     grad_log_path = f"{path}/grad_epoch{epoch}_issupcon_log.csv"
+#     full_grad_log_path = f"{path}/grad_epoch{epoch}_issupcon_full.csv"
+#     is_new_log_file = not os.path.exists(grad_log_path)
+
+#     grad_sum_dict = defaultdict(float)
+#     grad_count_dict = defaultdict(int)
+#     grad_raw_dict = defaultdict(list)
+
+#     print("→ grad_log_path:", grad_log_path)
+#     print("→ full_grad_log_path:", full_grad_log_path)
+
+#     for (images, labels, importance_weight, index) in grad_loader:
+#         if torch.cuda.is_available():
+#             images = images.cuda(non_blocking=True)
+#             labels = labels.cuda(non_blocking=True)
+
+#         bsz = labels.shape[0]
+
+#         with torch.no_grad():
+#             w = model.prototypes.weight.data.clone()
+#             w = nn.functional.normalize(w, dim=1, p=2)
+#             model.prototypes.weight.copy_(w)
+
+#         features, output = model(images)
+#         target_labels = list(range(opt.target_task * opt.cls_per_task,
+#                                    (opt.target_task + 1) * opt.cls_per_task))
+
+#         loss = criterion(output, features, labels, importance_weight, index,
+#                          target_labels=target_labels,
+#                          sample_num=subset_sample_num,
+#                          score_mask=score_mask,
+#                          reduction='grad_analysis')
+
+#         label_to_indices = defaultdict(list)
+#         for i in range(bsz):
+#             label = labels[i].item()
+#             label_to_indices[label].append(i)
+
+#         for label_i, indices in label_to_indices.items():
+#             loss_i = loss[indices].sum()
+#             optimizer.zero_grad()
+#             model.zero_grad()
+#             loss_i.backward(retain_graph=True)
+
+#             for name, param in model.named_parameters():
+#                 if not param.requires_grad or param.grad is None:
+#                     continue
+
+#                 param_type = name.split('.')[-1]
+#                 layer_name = '.'.join(name.split('.')[:-1])
+#                 grad = param.grad.detach().cpu()
+
+#                 # # === 集計用 ===
+#                 # if grad.dim() == 4:
+#                 #     grad_reshaped = grad.view(grad.shape[0], -1)
+#                 #     abs_sum = grad_reshaped.abs().sum(dim=1)
+#                 #     for j, g in enumerate(abs_sum):
+#                 #         key = (label_i, layer_name, param_type, str([j]))
+#                 #         grad_sum_dict[key] += g.item()
+#                 #         grad_count_dict[key] += 1
+#                 # elif grad.dim() == 2:
+#                 #     abs_sum = grad.abs().sum(dim=1)
+#                 #     for j, g in enumerate(abs_sum):
+#                 #         key = (label_i, layer_name, param_type, str([j]))
+#                 #         grad_sum_dict[key] += g.item()
+#                 #         grad_count_dict[key] += 1
+#                 # elif grad.dim() == 1:
+#                 #     for j, g in enumerate(grad.abs()):
+#                 #         key = (label_i, layer_name, param_type, str([j]))
+#                 #         grad_sum_dict[key] += g.item()
+#                 #         grad_count_dict[key] += 1
+
+#                 # === 詳細記録用（全パラメータ） ===
+#                 for index in np.ndindex(grad.shape):
+#                     grad_value = grad[index].item()
+#                     key = (label_i, layer_name, param_type, str(list(index)))
+#                     grad_raw_dict[key].append(grad_value)
+
+#     # # === ノルム集計のCSV出力 ===
+#     # with open(grad_log_path, mode='a', newline='') as f:
+#     #     writer = csv.writer(f)
+#     #     if is_new_log_file:
+#     #         writer.writerow(['current task', 'epoch', 'anchor_label', 'layer', 'param_type', 'index', 'grad_sum', 'grad_mean'])
+
+#     #     for key, grad_sum in grad_sum_dict.items():
+#     #         count = grad_count_dict[key]
+#     #         grad_mean = grad_sum / len(grad_loader.dataset)
+#     #         label_i, layer_name, param_type, index_str = key
+#     #         writer.writerow([opt.target_task, epoch, label_i, layer_name, param_type, index_str, grad_sum, grad_mean])
+
+#     # === 詳細記録のCSV出力 ===
+#     write_full_grad_to_csv(grad_raw_dict, full_grad_log_path, epoch, opt.target_task)
+
+
+
+
+
+# def save_fine_grained_gradients(grad_tensor, label_i, layer_name, param_type, csv_writer, epoch, task_id):
+#     """
+#     1つのCSVファイルに全パラメータの勾配を記録（多次元indexで）
+#     """
+#     grad_tensor = grad_tensor.detach().cpu()
+#     for index in np.ndindex(grad_tensor.shape):
+#         grad_value = grad_tensor[index].item()
+#         csv_writer.writerow([
+#             task_id,
+#             epoch,
+#             label_i,
+#             layer_name,
+#             param_type,
+#             str(list(index)),
+#             grad_value
+#         ])
+
+
+# def grad_analysis_is_supcon(opt, model, optimizer, criterion, grad_loader, epoch, importance_weight, index, subset_sample_num, score_mask):
+#     if not (opt.grad_analysis and (epoch == opt.epochs - 1 or epoch % opt.grad_analysis_freq == 0)):
+#         return
+
+#     path = f"{opt.explog_path}/gradreplay/task{opt.target_task}"
+#     os.makedirs(path, exist_ok=True)
+
+#     # 出力ファイル（集計と詳細）
+#     grad_log_path = f"{path}/grad_epoch{epoch}_issupcon_log.csv"
+#     full_grad_log_path = f"{path}/grad_epoch{epoch}_issupcon_full.csv"
+#     is_new_log_file = not os.path.exists(grad_log_path)
+#     is_new_full_file = not os.path.exists(full_grad_log_path)
+
+#     print("→ grad_log_path:", grad_log_path)
+#     print("→ full_grad_log_path:", full_grad_log_path)
+
+#     grad_sum_dict = defaultdict(float)
+#     grad_count_dict = defaultdict(int)
+
+#     with open(full_grad_log_path, mode='a', newline='') as full_f:
+#         full_writer = csv.writer(full_f)
+#         if is_new_full_file:
+#             full_writer.writerow(['current task', 'epoch', 'anchor_label', 'layer', 'param_type', 'index', 'grad_value'])
+
+#         for (images, labels, importance_weight, index) in grad_loader:
+#             if torch.cuda.is_available():
+#                 images = images.cuda(non_blocking=True)
+#                 labels = labels.cuda(non_blocking=True)
+
+#             bsz = labels.shape[0]
+
+#             # normalize the prototypes
+#             with torch.no_grad():
+#                 w = model.prototypes.weight.data.clone()
+#                 w = nn.functional.normalize(w, dim=1, p=2)
+#                 model.prototypes.weight.copy_(w)
+
+#             features, output = model(images)
+
+#             # 現在タスクのクラス
+#             target_labels = list(range(opt.target_task * opt.cls_per_task,
+#                                        (opt.target_task + 1) * opt.cls_per_task))
+
+#             # サンプルごとの損失計算
+#             loss = criterion(output, features, labels, importance_weight, index,
+#                              target_labels=target_labels,
+#                              sample_num=subset_sample_num,
+#                              score_mask=score_mask,
+#                              reduction='grad_analysis')
+
+#             # ラベルごとに backward
+#             label_to_indices = defaultdict(list)
+#             for i in range(bsz):
+#                 label = labels[i].item()
+#                 label_to_indices[label].append(i)
+
+#             for label_i, indices in label_to_indices.items():
+#                 loss_i = loss[indices].sum()
+#                 optimizer.zero_grad()
+#                 model.zero_grad()
+#                 loss_i.backward(retain_graph=True)
+
+#                 for name, param in model.named_parameters():
+#                     if not param.requires_grad or param.grad is None:
+#                         continue
+
+#                     param_type = name.split('.')[-1]
+#                     layer_name = '.'.join(name.split('.')[:-1])
+#                     grad = param.grad.detach().cpu()
+
+#                     # === ① 集計用（grad_sum, grad_mean） ===
+#                     if grad.dim() == 4:
+#                         grad = grad.view(grad.shape[0], -1)
+#                         abs_sum = grad.abs().sum(dim=1)
+#                         for j, g in enumerate(abs_sum):
+#                             key = (label_i, layer_name, param_type, str([j]))
+#                             grad_sum_dict[key] += g.item()
+#                             grad_count_dict[key] += 1
+#                     elif grad.dim() == 2:
+#                         abs_sum = grad.abs().sum(dim=1)
+#                         for j, g in enumerate(abs_sum):
+#                             key = (label_i, layer_name, param_type, str([j]))
+#                             grad_sum_dict[key] += g.item()
+#                             grad_count_dict[key] += 1
+#                     elif grad.dim() == 1:
+#                         for j, g in enumerate(grad.abs()):
+#                             key = (label_i, layer_name, param_type, str([j]))
+#                             grad_sum_dict[key] += g.item()
+#                             grad_count_dict[key] += 1
+
+#                     # === ② 詳細ログ（パラメータ単位） ===
+#                     save_fine_grained_gradients(
+#                         grad_tensor=param.grad,
+#                         label_i=label_i,
+#                         layer_name=layer_name,
+#                         param_type=param_type,
+#                         csv_writer=full_writer,
+#                         epoch=epoch,
+#                         task_id=opt.target_task
+#                     )
+
+#     # === 集計ログをCSV出力（grad_sum / grad_mean） ===
+#     with open(grad_log_path, mode='a', newline='') as f:
+#         writer = csv.writer(f)
+#         if is_new_log_file:
+#             writer.writerow(['current task', 'epoch', 'anchor_label', 'layer', 'param_type', 'index', 'grad_sum', 'grad_mean'])
+
+#         for key, grad_sum in grad_sum_dict.items():
+#             count = grad_count_dict[key]
+#             grad_mean = grad_sum / len(grad_loader.dataset)
+#             label_i, layer_name, param_type, index_str = key
+#             writer.writerow([
+#                 opt.target_task,
+#                 epoch,
+#                 label_i,
+#                 layer_name,
+#                 param_type,
+#                 index_str,
+#                 grad_sum,
+#                 grad_mean
+#             ])
+
+
+
+
+## 絶対値の記録は可能（これだけ関数は完成）
+# def grad_analysis_is_supcon(opt, model, optimizer, criterion, grad_loader, epoch, importance_weight, index, subset_sample_num, score_mask):
+#     if not (opt.grad_analysis and (epoch == opt.epochs - 1 or epoch % opt.grad_analysis_freq == 0)):
+#         return
+
+#     path = f"{opt.explog_path}/gradreplay/task{opt.target_task}"
+#     os.makedirs(path, exist_ok=True)
+#     grad_log_path = f"{path}/grad_epoch{epoch}_issupcon_log.csv"
+#     is_new_file = not os.path.exists(grad_log_path)
+#     print("grad_log_path: ", grad_log_path)
+
+#     grad_sum_dict = defaultdict(float)
+#     grad_count_dict = defaultdict(int)
+
+#     for (images, labels, importance_weight, index) in grad_loader:
+        
+#         if torch.cuda.is_available():
+#             images = images.cuda(non_blocking=True)
+#             labels = labels.cuda(non_blocking=True)
+#         bsz = labels.shape[0]
+
+#         # normalize the prototypes
+#         with torch.no_grad():
+#             prev_task_mask = labels < opt.target_task * opt.cls_per_task
+
+#             w = model.prototypes.weight.data.clone()
+#             w = nn.functional.normalize(w, dim=1, p=2)
+#             model.prototypes.weight.copy_(w)
+
+#         features, output = model(images)
+
+#         # 現在タスクのクラス
+#         target_labels = list(range(opt.target_task*opt.cls_per_task, (opt.target_task+1)*opt.cls_per_task))
+
+#         # ISSupCon
+#         loss = criterion(output,
+#                         features, 
+#                         labels, 
+#                         importance_weight, 
+#                         index, 
+#                         target_labels=target_labels, 
+#                         sample_num=subset_sample_num, 
+#                         score_mask=score_mask,
+#                         reduction='grad_analysis',
+#                         )
+#         # print("loss.shape: ", loss.shape)  # loss.shape:  torch.Size([500]) <-- バッチサイズ
+
+#         # ラベルごとに index をまとめる
+#         label_to_indices = defaultdict(list)
+#         for i in range(bsz):
+#             label = labels[i].item()
+#             label_to_indices[label].append(i)
+
+
+
+#         for label_i, indices in label_to_indices.items():
+#             # 指定ラベルの損失を平均して backward
+#             # loss_i = loss_tensor[:, indices].mean()
+#             loss_i = loss[indices].sum()
+#             optimizer.zero_grad()
+#             model.zero_grad()
+#             loss_i.backward(retain_graph=True)
+
+#             for name, param in model.named_parameters():
+#                 if not param.requires_grad:
+#                     continue
+
+#                 param_type = name.split('.')[-1]
+#                 layer_name = '.'.join(name.split('.')[:-1])
+#                 grad = param.grad.detach().cpu()
+
+#                 if grad.dim() == 4:
+#                     grad = grad.view(grad.shape[0], -1)
+#                     abs_sum = grad.abs().sum(dim=1)
+#                     for j, g in enumerate(abs_sum):
+#                         key = (label_i, layer_name, param_type, str([j]))
+#                         grad_sum_dict[key] += g.item()
+#                         grad_count_dict[key] += 1
+
+#                 elif grad.dim() == 2:
+#                     abs_sum = grad.abs().sum(dim=1)
+#                     for j, g in enumerate(abs_sum):
+#                         key = (label_i, layer_name, param_type, str([j]))
+#                         grad_sum_dict[key] += g.item()
+#                         grad_count_dict[key] += 1
+
+#                 elif grad.dim() == 1:
+#                     for j, g in enumerate(grad.abs()):
+#                         key = (label_i, layer_name, param_type, str([j]))
+#                         grad_sum_dict[key] += g.item()
+#                         grad_count_dict[key] += 1
+                
+
+
+#     #  最終的に平均値をCSVに書き出し
+#     with open(grad_log_path, mode='a', newline='') as f:
+#         writer = csv.writer(f)
+#         if is_new_file:
+#             writer.writerow(['current task', 'epoch', 'anchor_label', 'layer', 'param_type', 'index', 'grad_sum', 'grad_mean'])
+
+#         for key, grad_sum in grad_sum_dict.items():
+#             count = grad_count_dict[key]
+#             # grad_mean = grad_sum / count if count > 0 else 0.0
+#             grad_mean = grad_sum / len(grad_loader.dataset)
+#             label_i, layer_name, param_type, index_str = key
+#             writer.writerow([
+#                 opt.target_task,
+#                 epoch,
+#                 label_i,
+#                 layer_name,
+#                 param_type,
+#                 index_str,
+#                 grad_sum,
+#                 grad_mean
+#             ])
 
 
 
