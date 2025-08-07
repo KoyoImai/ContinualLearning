@@ -96,6 +96,7 @@ def train_cclis(opt, model, model2, criterion, optimizer, scheduler, train_loade
 
         # 現在タスクのクラス
         target_labels = list(range(opt.target_task*opt.cls_per_task, (opt.target_task+1)*opt.cls_per_task))
+        # print("target_labels : ", target_labels)
 
         # ISSupCon
         loss = criterion(output,
@@ -210,10 +211,10 @@ def train_cclis(opt, model, model2, criterion, optimizer, scheduler, train_loade
 
     # 勾配分析（訓練用）
     if (opt.grad_analysis and epoch == opt.epochs-1) or (opt.grad_analysis and epoch % opt.grad_analysis_freq == 0):
-        grad_analysis_is_supcon(opt=opt, model=model, optimizer=optimizer, criterion=criterion, grad_loader=gradreplay_train_loader, epoch=epoch,
-                                importance_weight=importance_weight, index=index, subset_sample_num=subset_sample_num, score_mask=score_mask)
-        # if opt.target_task > 0:
-        #     grad_analysis_distill(opt, model, model2, optimizer, criterion, gradtask_train_loaders, epoch, distill_type)
+        # grad_analysis_is_supcon(opt=opt, model=model, optimizer=optimizer, criterion=criterion, grad_loader=gradreplay_train_loader, epoch=epoch,
+        #                         importance_weight=importance_weight, index=index, subset_sample_num=subset_sample_num, score_mask=score_mask)
+        if opt.target_task > 0:
+            grad_analysis_distill(opt, model, model2, optimizer, criterion, gradtask_train_loaders, epoch, distill_type)
 
     return losses.avg, model2
 
@@ -341,6 +342,127 @@ def grad_analysis_is_supcon(opt, model, optimizer, criterion, grad_loader, epoch
 
 
 
+def grad_analysis_distill(opt, model, model2, optimizer, grad_loader, epoch):
+    if not (opt.grad_analysis and (epoch == opt.epochs - 1 or epoch % opt.grad_analysis_freq == 0)):
+        return
+
+    path = f"{opt.explog_path}/gradreplay/task{opt.target_task}"
+    os.makedirs(path, exist_ok=True)
+    grad_log_path = f"{path}/grad_epoch{epoch}_prd_log.csv"
+    is_new_file = not os.path.exists(grad_log_path)
+    print("grad_log_path: ", grad_log_path)
+
+    grad_sum_dict = defaultdict(float)
+    grad_count_dict = defaultdict(int)
+
+    for (images, labels, _, _) in grad_loader:
+
+        if torch.cuda.is_available():
+            images = images.cuda(non_blocking=True)
+            labels = labels.cuda(non_blocking=True)
+        bsz = labels.shape[0]
+
+        with torch.no_grad():
+            # normalize the prototypes
+            w = model.prototypes.weight.data.clone()
+            w = nn.functional.normalize(w, dim=1, p=2)
+            model.prototypes.weight.copy_(w)
+
+        features, output = model(images)
+        device = output.device
+
+        if opt.target_task == 0:
+            continue
+
+        target_labels = list(range(opt.target_task * opt.cls_per_task, (opt.target_task + 1) * opt.cls_per_task))
+        prev_all_labels = torch.arange(target_labels[0]).to(device)
+
+        # プロトタイプマスクを構築
+        prototypes_mask = torch.zeros(len(prev_all_labels), opt.n_cls, device=device)
+        prototypes_mask.scatter_(1, prev_all_labels.view(-1, 1), 1)
+
+        # PRD (cur)
+        sim_prev_task = torch.matmul(prototypes_mask, output)  # [prev_cls, batch]
+        features1_sim = sim_prev_task / opt.current_temp
+        logits_max1, _ = torch.max(features1_sim, dim=0, keepdim=True)
+        features1_sim = features1_sim - logits_max1.detach()
+        logits1 = torch.exp(features1_sim) / torch.exp(features1_sim).sum(dim=0, keepdim=True)  # shape: [prev_cls, batch]
+
+        # PRD (past)
+        with torch.no_grad():
+            _, sim2_prev_task = model2(images)
+            sim2_prev_task = torch.matmul(prototypes_mask, sim2_prev_task)
+            features2_sim = sim2_prev_task / opt.past_temp
+            logits_max2, _ = torch.max(features2_sim, dim=0, keepdim=True)
+            features2_sim = features2_sim - logits_max2.detach()
+            logits2 = torch.exp(features2_sim) / torch.exp(features2_sim).sum(dim=0, keepdim=True)
+
+        # サンプルごとの PRD loss（バッチ次元）
+        loss_vec = (-logits2 * torch.log(logits1)).sum(0)  # shape: [batch_size]
+
+        # ラベルごとに index をまとめる
+        label_to_indices = defaultdict(list)
+        for i in range(bsz):
+            label = labels[i].item()
+            label_to_indices[label].append(i)
+
+        # 各ラベルに対して勾配を計算・記録
+        for label_i, indices in label_to_indices.items():
+            loss_i = loss_vec[indices].sum()
+            optimizer.zero_grad()
+            model.zero_grad()
+            loss_i.backward(retain_graph=True)
+
+            for name, param in model.named_parameters():
+                if not param.requires_grad or param.grad is None:
+                    continue
+
+                param_type = name.split('.')[-1]
+                layer_name = '.'.join(name.split('.')[:-1])
+                grad = param.grad.detach().cpu()
+
+                if grad.dim() == 4:
+                    grad = grad.view(grad.shape[0], -1)
+                    abs_sum = grad.abs().sum(dim=1)
+                    for j, g in enumerate(abs_sum):
+                        key = (label_i, layer_name, param_type, str([j]))
+                        grad_sum_dict[key] += g.item()
+                        grad_count_dict[key] += 1
+
+                elif grad.dim() == 2:
+                    abs_sum = grad.abs().sum(dim=1)
+                    for j, g in enumerate(abs_sum):
+                        key = (label_i, layer_name, param_type, str([j]))
+                        grad_sum_dict[key] += g.item()
+                        grad_count_dict[key] += 1
+
+                elif grad.dim() == 1:
+                    for j, g in enumerate(grad.abs()):
+                        key = (label_i, layer_name, param_type, str([j]))
+                        grad_sum_dict[key] += g.item()
+                        grad_count_dict[key] += 1
+
+    # 平均値をCSVに出力
+    with open(grad_log_path, mode='a', newline='') as f:
+        writer = csv.writer(f)
+        if is_new_file:
+            writer.writerow(['current task', 'epoch', 'anchor_label', 'layer', 'param_type', 'index', 'grad_sum', 'grad_mean'])
+
+        for key, grad_sum in grad_sum_dict.items():
+            count = grad_count_dict[key]
+            grad_mean = grad_sum / len(grad_loader.dataset)
+            label_i, layer_name, param_type, index_str = key
+            writer.writerow([
+                opt.target_task,
+                epoch,
+                label_i,
+                layer_name,
+                param_type,
+                index_str,
+                grad_sum,
+                grad_mean
+            ])
+
 
 
 
@@ -457,176 +579,191 @@ def grad_analysis_is_supcon(opt, model, optimizer, criterion, grad_loader, epoch
 
 
 
-def grad_analysis_distill(opt, model, model2, optimizer, criterion, grad_loaders, epoch, distill_type):
+# def grad_analysis_distill(opt, model, model2, optimizer, criterion, grad_loaders, epoch, distill_type):
 
-    if (opt.grad_analysis and epoch == opt.epochs-1) or (opt.grad_analysis and epoch % opt.grad_analysis_freq == 0):
+#     if (opt.grad_analysis and epoch == opt.epochs-1) or (opt.grad_analysis and epoch % opt.grad_analysis_freq == 0):
 
-        grad_log_path = f"{opt.explog_path}/gradtask_train_distill_log.csv"
-        is_new_file = not os.path.exists(grad_log_path)
-        print("grad_log_path: ", grad_log_path)
+#         grad_log_path = f"{opt.explog_path}/gradtask_train_distill_log.csv"
+#         is_new_file = not os.path.exists(grad_log_path)
+#         print("grad_log_path: ", grad_log_path)
 
-        with open(grad_log_path, mode='a', newline='') as f:
+#         with open(grad_log_path, mode='a', newline='') as f:
 
-            writer = csv.writer(f)
-            if is_new_file:
-                writer.writerow(['current task', 'epoch', 'task', 'layer', 'param_type', 'index', 'grad_value'])
+#             writer = csv.writer(f)
+#             if is_new_file:
+#                 writer.writerow(['current task', 'epoch', 'task', 'layer', 'param_type', 'index', 'grad_value'])
 
-            for taskid, loader in enumerate(grad_loaders):
+#             for taskid, loader in enumerate(grad_loaders):
 
-                # 勾配を初期化
-                optimizer.zero_grad()
-                model.zero_grad()
+#                 # 勾配を初期化
+#                 optimizer.zero_grad()
+#                 model.zero_grad()
 
-                for (images, labels, importance_weight, index) in loader:
+#                 for (images, labels, importance_weight, index) in loader:
 
-                    if torch.cuda.is_available():
-                        images = images.cuda(non_blocking=True)
-                        labels = labels.cuda(non_blocking=True)
+#                     if torch.cuda.is_available():
+#                         images = images.cuda(non_blocking=True)
+#                         labels = labels.cuda(non_blocking=True)
                     
-                    bsz = labels.shape[0]
+#                     bsz = labels.shape[0]
 
-                    # normalize the prototypes
-                    with torch.no_grad():
-                        prev_task_mask = labels < opt.target_task * opt.cls_per_task
+#                     # normalize the prototypes
+#                     with torch.no_grad():
+#                         prev_task_mask = labels < opt.target_task * opt.cls_per_task
 
-                        w = model.prototypes.weight.data.clone()
-                        w = nn.functional.normalize(w, dim=1, p=2)
-                        model.prototypes.weight.copy_(w)
+#                         w = model.prototypes.weight.data.clone()
+#                         w = nn.functional.normalize(w, dim=1, p=2)
+#                         model.prototypes.weight.copy_(w)
                     
-                    features, output = model(images)
+#                     features, output = model(images)
 
-                    device = (torch.device('cuda')
-                            if features.is_cuda
-                            else torch.device('cpu'))
+#                     device = (torch.device('cuda')
+#                             if features.is_cuda
+#                             else torch.device('cpu'))
                     
-                    # 現在タスクのクラス
-                    target_labels = list(range(opt.target_task*opt.cls_per_task, (opt.target_task+1)*opt.cls_per_task))
+#                     # 現在タスクのクラス
+#                     target_labels = list(range(opt.target_task*opt.cls_per_task, (opt.target_task+1)*opt.cls_per_task))
+#                     print("target_labels : ", target_labels)
 
 
-                    if distill_type == 'IRD':
-                        if opt.target_task > 0:
-                            # IRD (cur)
-                            labels_mask = labels < min(target_labels)
+#                     if distill_type == 'IRD':
+#                         if opt.target_task > 0:
+#                             # IRD (cur)
+#                             labels_mask = labels < min(target_labels)
 
-                            features1_prev_task = features[labels_mask] if IRD_type == 'prev' else features
+#                             features1_prev_task = features[labels_mask] if IRD_type == 'prev' else features
 
-                            features1_sim = torch.div(torch.matmul(features1_prev_task, features1_prev_task.T), opt.current_temp)
-                            logits_mask = torch.scatter(
-                                torch.ones_like(features1_sim),
-                                1,
-                                torch.arange(features1_sim.size(0)).view(-1, 1).cuda(non_blocking=True),
-                                0
-                            )
-                            logits_max1, _ = torch.max(features1_sim * logits_mask, dim=1, keepdim=True)
-                            features1_sim = features1_sim - logits_max1.detach()
-                            row_size = features1_sim.size(0)
-                            logits1 = torch.exp(features1_sim[logits_mask.bool()].view(row_size, -1)) / torch.exp(features1_sim[logits_mask.bool()].view(row_size, -1)).sum(dim=1, keepdim=True)
+#                             features1_sim = torch.div(torch.matmul(features1_prev_task, features1_prev_task.T), opt.current_temp)
+#                             logits_mask = torch.scatter(
+#                                 torch.ones_like(features1_sim),
+#                                 1,
+#                                 torch.arange(features1_sim.size(0)).view(-1, 1).cuda(non_blocking=True),
+#                                 0
+#                             )
+#                             logits_max1, _ = torch.max(features1_sim * logits_mask, dim=1, keepdim=True)
+#                             features1_sim = features1_sim - logits_max1.detach()
+#                             row_size = features1_sim.size(0)
+#                             logits1 = torch.exp(features1_sim[logits_mask.bool()].view(row_size, -1)) / torch.exp(features1_sim[logits_mask.bool()].view(row_size, -1)).sum(dim=1, keepdim=True)
 
-                            # IRD (past)
-                            with torch.no_grad():
-                                features2, _ = model2(images)
-                                features2_prev_task = features2[labels_mask] if IRD_type == 'prev' else features2
+#                             # IRD (past)
+#                             with torch.no_grad():
+#                                 features2, _ = model2(images)
+#                                 features2_prev_task = features2[labels_mask] if IRD_type == 'prev' else features2
 
-                                features2_sim = torch.div(torch.matmul(features2_prev_task, features2_prev_task.T), opt.past_temp)
-                                logits_max2, _ = torch.max(features2_sim*logits_mask, dim=1, keepdim=True)
-                                features2_sim = features2_sim - logits_max2.detach()
-                                logits2 = torch.exp(features2_sim[logits_mask.bool()].view(row_size, -1)) /  torch.exp(features2_sim[logits_mask.bool()].view(row_size, -1)).sum(dim=1, keepdim=True)
+#                                 features2_sim = torch.div(torch.matmul(features2_prev_task, features2_prev_task.T), opt.past_temp)
+#                                 logits_max2, _ = torch.max(features2_sim*logits_mask, dim=1, keepdim=True)
+#                                 features2_sim = features2_sim - logits_max2.detach()
+#                                 logits2 = torch.exp(features2_sim[logits_mask.bool()].view(row_size, -1)) /  torch.exp(features2_sim[logits_mask.bool()].view(row_size, -1)).sum(dim=1, keepdim=True)
 
-                            loss_distill = (-logits2 * torch.log(logits1)).sum(1).mean()
-                            loss = opt.distill_power * loss_distill
+#                             loss_distill = (-logits2 * torch.log(logits1)).sum(1).mean()
+#                             loss = opt.distill_power * loss_distill
                     
-                    elif distill_type == 'PRD':
-                        if opt.target_task > 0:
-                            all_labels = torch.unique(labels).view(-1, 1)
+#                     # プロトタイプ蒸留損失
+#                     elif distill_type == 'PRD':
+#                         if opt.target_task > 0:
 
-                            prev_all_labels = torch.arange(target_labels[0])
+#                             # 全ての種類のラベルを獲得
+#                             all_labels = torch.unique(labels).view(-1, 1)
+
+#                             # 過去タスクのすべてのクラス
+#                             prev_all_labels = torch.arange(target_labels[0])
                             
-                            prototypes_mask = torch.scatter(
-                                torch.zeros(len(prev_all_labels), opt.n_cls).float(),
-                                1,
-                                prev_all_labels.view(-1,1),
-                                1
-                                ).to(device)
+#                             # プロトタイプ重みに対して，過去クラスだけを抽出するマスクを作成
+#                             prototypes_mask = torch.scatter(
+#                                 torch.zeros(len(prev_all_labels), opt.n_cls).float(),
+#                                 1,
+#                                 prev_all_labels.view(-1,1),
+#                                 1
+#                                 ).to(device)
+#                             # print("prototypes_mask.shape: ", prototypes_mask.shape)    # prototypes_mask.shape:  torch.Size([2, 10])
+#                             # print("prototypes_mask: ", prototypes_mask)
+#                             # prototypes_mask:  tensor([[1., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+#                             #                             [0., 1., 0., 0., 0., 0., 0., 0., 0., 0.]], device='cuda:0')
 
-                            labels_mask = labels < min(target_labels)
+#                             labels_mask = labels < min(target_labels)
 
-                            # PRD (cur)
-                            sim_prev_task = torch.matmul(prototypes_mask, output)
+#                             # PRD (cur)
+#                             sim_prev_task = torch.matmul(prototypes_mask, output)
+#                             # print("output.shape: ", output.shape)                # output.shape:  torch.Size([10, 1000])
+#                             # print("sim_prev_task.shape: ", sim_prev_task.shape)  # sim_prev_task.shape:  torch.Size([2, 1000])
 
-                            features1_sim = torch.div(sim_prev_task, opt.current_temp)
+#                             features1_sim = torch.div(sim_prev_task, opt.current_temp)
+#                             # print("features1_sim.shape: ", features1_sim.shape)         # features1_sim.shape:  torch.Size([2, 1000])
                             
 
-                            logits_max1, _ = torch.max(features1_sim, dim=0, keepdim=True)
-                            features1_sim = features1_sim - logits_max1.detach()  # number stability
-                            row_size = features1_sim.size(0)
+#                             # 数値的安定性
+#                             logits_max1, _ = torch.max(features1_sim, dim=0, keepdim=True)
+#                             features1_sim = features1_sim - logits_max1.detach()  # number stability
+#                             row_size = features1_sim.size(0)
                             
-                            logits1 = torch.exp(features1_sim) / torch.exp(features1_sim).sum(dim=0, keepdim=True)
+#                             logits1 = torch.exp(features1_sim) / torch.exp(features1_sim).sum(dim=0, keepdim=True)
+#                             # print("logits1.shape: ", logits1.shape)     # logits1.shape:  torch.Size([2, 1000])
 
-                            # PRD (past)
-                            with torch.no_grad():
-                                _, sim2_prev_task = model2(images)
-                                sim2_prev_task = torch.matmul(prototypes_mask, sim2_prev_task)
+#                             # PRD (past)
+#                             with torch.no_grad():
+#                                 _, sim2_prev_task = model2(images)
+#                                 sim2_prev_task = torch.matmul(prototypes_mask, sim2_prev_task)
 
-                                features2_sim = torch.div(sim2_prev_task, opt.past_temp)
-                                logits_max2, _ = torch.max(features2_sim, dim=0, keepdim=True)
-                                features2_sim = features2_sim - logits_max2.detach()
-                                logits2 = torch.exp(features2_sim) /  torch.exp(features2_sim).sum(dim=0, keepdim=True)
+#                                 features2_sim = torch.div(sim2_prev_task, opt.past_temp)
+#                                 logits_max2, _ = torch.max(features2_sim, dim=0, keepdim=True)
+#                                 features2_sim = features2_sim - logits_max2.detach()
+#                                 logits2 = torch.exp(features2_sim) /  torch.exp(features2_sim).sum(dim=0, keepdim=True)
 
-                            loss_distill = (-logits2 * torch.log(logits1)).sum(0).mean()
-                            loss = opt.distill_power * loss_distill
+#                             loss_distill = (-logits2 * torch.log(logits1)).sum(0).mean()
+#                             loss = opt.distill_power * loss_distill
 
-                    else:
-                        raise ValueError("distill type {} is not supported".format(distill_type))
+#                     else:
+#                         raise ValueError("distill type {} is not supported".format(distill_type))
                     
-                    loss.backward()
+#                     loss.backward()
 
-                # 勾配情報をカーネル単位で出力
-                for name, param in model.named_parameters():
-                    if param.requires_grad:
+#                 # 勾配情報をカーネル単位で出力
+#                 for name, param in model.named_parameters():
+#                     if param.requires_grad:
 
-                        param_type = name.split('.')[-1]  # パラメータのタイプ（例: weight, bias）
-                        layer_name = '.'.join(name.split('.')[:-1])  # レイヤー名
-                        grad = param.grad.detach().cpu()
+#                         param_type = name.split('.')[-1]  # パラメータのタイプ（例: weight, bias）
+#                         layer_name = '.'.join(name.split('.')[:-1])  # レイヤー名
+#                         grad = param.grad.detach().cpu()
                 
 
-                        if grad.dim() == 4:  # Conv: [out_ch, in_ch, kH, kW]
-                            grad = grad.view(grad.shape[0], -1)  # [out_ch, *]
-                            abs_sum = grad.abs().sum(dim=1)
-                            for i, g in enumerate(abs_sum):
-                                writer.writerow([
-                                    opt.target_task,  # 現在のタスク
-                                    epoch,
-                                    int(taskid),  # タスクID
-                                    layer_name,
-                                    param_type,
-                                    str([i]),  # カーネル index
-                                    g.item()
-                                ])
+#                         if grad.dim() == 4:  # Conv: [out_ch, in_ch, kH, kW]
+#                             grad = grad.view(grad.shape[0], -1)  # [out_ch, *]
+#                             abs_sum = grad.abs().sum(dim=1)
+#                             for i, g in enumerate(abs_sum):
+#                                 writer.writerow([
+#                                     opt.target_task,  # 現在のタスク
+#                                     epoch,
+#                                     int(taskid),  # タスクID
+#                                     layer_name,
+#                                     param_type,
+#                                     str([i]),  # カーネル index
+#                                     g.item()
+#                                 ])
 
-                        elif grad.dim() == 2:  # Linear: [out_dim, in_dim]
-                            abs_sum = grad.abs().sum(dim=1)
-                            for i, g in enumerate(abs_sum):
-                                writer.writerow([
-                                    opt.target_task,  # 現在のタスク
-                                    epoch,
-                                    int(taskid),  # タスクID
-                                    layer_name,
-                                    param_type,
-                                    str([i]),  # 出力ユニット index
-                                    g.item()
-                                ])
+#                         elif grad.dim() == 2:  # Linear: [out_dim, in_dim]
+#                             abs_sum = grad.abs().sum(dim=1)
+#                             for i, g in enumerate(abs_sum):
+#                                 writer.writerow([
+#                                     opt.target_task,  # 現在のタスク
+#                                     epoch,
+#                                     int(taskid),  # タスクID
+#                                     layer_name,
+#                                     param_type,
+#                                     str([i]),  # 出力ユニット index
+#                                     g.item()
+#                                 ])
 
-                        elif grad.dim() == 1:  # Bias: [N]
-                            for i, g in enumerate(grad.abs()):
-                                writer.writerow([
-                                    opt.target_task,  # 現在のタスク
-                                    epoch,
-                                    int(taskid),  # タスクID
-                                    layer_name,
-                                    param_type,
-                                    str([i]),
-                                    g.item()
-                                ])
+#                         elif grad.dim() == 1:  # Bias: [N]
+#                             for i, g in enumerate(grad.abs()):
+#                                 writer.writerow([
+#                                     opt.target_task,  # 現在のタスク
+#                                     epoch,
+#                                     int(taskid),  # タスクID
+#                                     layer_name,
+#                                     param_type,
+#                                     str([i]),
+#                                     g.item()
+#                                 ])
 
 
 
