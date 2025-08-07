@@ -26,6 +26,12 @@ def train_er(opt, model, model2, criterion, optimizer, scheduler, train_loader, 
     cnt  = [0.] * (opt.target_task + 1) * opt.cls_per_task
     correct_task = 0.0
 
+    # 勾配分析（初回エポックのみ）
+    if epoch == 1:
+        if (opt.grad_analysis and epoch == opt.epochs-1) or (opt.grad_analysis and epoch % opt.grad_analysis_freq == 0):
+            gradreplay_analysis_ce(opt, model, optimizer, criterion, gradreplay_train_loader, epoch-1)
+            # grad_analysis_ce(opt, model, optimizer, criterion, grad_train_loaders, epoch)
+
     for idx, (images, labels) in enumerate(train_loader):
 
         # gpu上に配置
@@ -85,7 +91,7 @@ def train_er(opt, model, model2, criterion, optimizer, scheduler, train_loader, 
     # 勾配分析
     if (opt.grad_analysis and epoch == opt.epochs-1) or (opt.grad_analysis and epoch % opt.grad_analysis_freq == 0):
         gradreplay_analysis_ce(opt, model, optimizer, criterion, gradreplay_train_loader, epoch)
-        grad_analysis_ce(opt, model, optimizer, criterion, grad_train_loaders, epoch)
+        # grad_analysis_ce(opt, model, optimizer, criterion, grad_train_loaders, epoch)
     
     return losses.avg, model2
 
@@ -121,6 +127,10 @@ def gradreplay_analysis_ce(opt, model, optimizer, criterion, grad_loader, epoch)
         for label_val, indices in label_to_indices.items():
             if len(indices) == 0:
                 continue
+
+            print("label_val: ", label_val)
+            print("indices: ", indices)
+            print()
 
             # 対象インデックスだけ取り出して損失を計算
             y_pred_subset = y_pred[indices]
@@ -209,7 +219,7 @@ def grad_analysis_ce(opt, model, optimizer, criterion, grad_train_loaders, epoch
                     inputs, targets = data
                     inputs, targets = inputs.cuda(), targets.cuda()
 
-                    y_pred = model(inputs)  # ← 修正：元は `images` だった
+                    y_pred = model(inputs)
                     loss = criterion(y_pred, targets).mean()
 
                     optimizer.zero_grad()
