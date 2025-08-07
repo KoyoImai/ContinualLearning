@@ -211,10 +211,10 @@ def train_cclis(opt, model, model2, criterion, optimizer, scheduler, train_loade
 
     # 勾配分析（訓練用）
     if (opt.grad_analysis and epoch == opt.epochs-1) or (opt.grad_analysis and epoch % opt.grad_analysis_freq == 0):
-        # grad_analysis_is_supcon(opt=opt, model=model, optimizer=optimizer, criterion=criterion, grad_loader=gradreplay_train_loader, epoch=epoch,
-        #                         importance_weight=importance_weight, index=index, subset_sample_num=subset_sample_num, score_mask=score_mask)
+        grad_analysis_is_supcon(opt=opt, model=model, optimizer=optimizer, criterion=criterion, grad_loader=gradreplay_train_loader, epoch=epoch,
+                                importance_weight=importance_weight, index=index, subset_sample_num=subset_sample_num, score_mask=score_mask)
         if opt.target_task > 0:
-            grad_analysis_distill(opt, model, model2, optimizer, criterion, gradtask_train_loaders, epoch, distill_type)
+            grad_analysis_distill(opt, model, model2, optimizer, criterion, gradreplay_train_loader, epoch, distill_type)
 
     return losses.avg, model2
 
@@ -342,13 +342,13 @@ def grad_analysis_is_supcon(opt, model, optimizer, criterion, grad_loader, epoch
 
 
 
-def grad_analysis_distill(opt, model, model2, optimizer, grad_loader, epoch):
+def grad_analysis_distill(opt, model, model2, optimizer, criterion, grad_loader, epoch, distill_type):
     if not (opt.grad_analysis and (epoch == opt.epochs - 1 or epoch % opt.grad_analysis_freq == 0)):
         return
 
     path = f"{opt.explog_path}/gradreplay/task{opt.target_task}"
     os.makedirs(path, exist_ok=True)
-    grad_log_path = f"{path}/grad_epoch{epoch}_prd_log.csv"
+    grad_log_path = f"{path}/grad_epoch{epoch}_distill_log.csv"
     is_new_file = not os.path.exists(grad_log_path)
     print("grad_log_path: ", grad_log_path)
 
@@ -375,30 +375,49 @@ def grad_analysis_distill(opt, model, model2, optimizer, grad_loader, epoch):
             continue
 
         target_labels = list(range(opt.target_task * opt.cls_per_task, (opt.target_task + 1) * opt.cls_per_task))
-        prev_all_labels = torch.arange(target_labels[0]).to(device)
+        prev_all_labels = torch.arange(target_labels[0])
 
         # プロトタイプマスクを構築
-        prototypes_mask = torch.zeros(len(prev_all_labels), opt.n_cls, device=device)
-        prototypes_mask.scatter_(1, prev_all_labels.view(-1, 1), 1)
+        # prototypes_mask = torch.zeros(len(prev_all_labels), opt.n_cls, device=device)
+        # prototypes_mask.scatter_(1, prev_all_labels.view(-1, 1), 1)
+        prototypes_mask = torch.scatter(
+                    torch.zeros(len(prev_all_labels), opt.n_cls).float(),
+                    1,
+                    prev_all_labels.view(-1,1),
+                    1
+                    ).to(device)
 
         # PRD (cur)
-        sim_prev_task = torch.matmul(prototypes_mask, output)  # [prev_cls, batch]
-        features1_sim = sim_prev_task / opt.current_temp
+        # sim_prev_task = torch.matmul(prototypes_mask, output)  # [prev_cls, batch]
+        # features1_sim = sim_prev_task / opt.current_temp
+        # logits_max1, _ = torch.max(features1_sim, dim=0, keepdim=True)
+        # features1_sim = features1_sim - logits_max1.detach()
+        # logits1 = torch.exp(features1_sim) / torch.exp(features1_sim).sum(dim=0, keepdim=True)  # shape: [prev_cls, batch]
+        sim_prev_task = torch.matmul(prototypes_mask, output)
+        features1_sim = torch.div(sim_prev_task, opt.current_temp)
         logits_max1, _ = torch.max(features1_sim, dim=0, keepdim=True)
-        features1_sim = features1_sim - logits_max1.detach()
-        logits1 = torch.exp(features1_sim) / torch.exp(features1_sim).sum(dim=0, keepdim=True)  # shape: [prev_cls, batch]
+        features1_sim = features1_sim - logits_max1.detach()  # number stability
+        row_size = features1_sim.size(0)
+        logits1 = torch.exp(features1_sim) / torch.exp(features1_sim).sum(dim=0, keepdim=True)
 
         # PRD (past)
         with torch.no_grad():
+            # _, sim2_prev_task = model2(images)
+            # sim2_prev_task = torch.matmul(prototypes_mask, sim2_prev_task)
+            # features2_sim = sim2_prev_task / opt.past_temp
+            # logits_max2, _ = torch.max(features2_sim, dim=0, keepdim=True)
+            # features2_sim = features2_sim - logits_max2.detach()
+            # logits2 = torch.exp(features2_sim) / torch.exp(features2_sim).sum(dim=0, keepdim=True)
             _, sim2_prev_task = model2(images)
             sim2_prev_task = torch.matmul(prototypes_mask, sim2_prev_task)
-            features2_sim = sim2_prev_task / opt.past_temp
+            features2_sim = torch.div(sim2_prev_task, opt.past_temp)
             logits_max2, _ = torch.max(features2_sim, dim=0, keepdim=True)
             features2_sim = features2_sim - logits_max2.detach()
-            logits2 = torch.exp(features2_sim) / torch.exp(features2_sim).sum(dim=0, keepdim=True)
+            logits2 = torch.exp(features2_sim) /  torch.exp(features2_sim).sum(dim=0, keepdim=True)
 
         # サンプルごとの PRD loss（バッチ次元）
         loss_vec = (-logits2 * torch.log(logits1)).sum(0)  # shape: [batch_size]
+        # print("loss_vec.shape: ", loss_vec.shape)          # loss_vec.shape:  torch.Size([500])
 
         # ラベルごとに index をまとめる
         label_to_indices = defaultdict(list)

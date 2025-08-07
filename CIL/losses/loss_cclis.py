@@ -18,6 +18,8 @@ class ISSupConLoss(nn.Module):
         
         self.embedding_shape = embedding_shape
 
+        self.wo_is = opt.wo_is
+
 
     def score_calculate(self, output, features, labels=None, importance_weight=None, index=None, target_labels=None, sample_num=[], mask=None, score_mask=[], all_labels=None):
         assert target_labels is not None and len(target_labels) > 0, "Target labels should be given as a list of integer"
@@ -226,11 +228,16 @@ class ISSupConLoss(nn.Module):
         # print("cur_task_mask.shape: ", cur_task_mask.shape)   # cur_task_mask.shape:  torch.Size([2, 512])
 
 
-        # (s_{i,j} - log())
-        _logits = logits - torch.log(_importance_weight) * all_mask
-        # print("_logits.shape: ", _logits.shape)    # _logits.shape:  torch.Size([2, 512])
-        log_prob = logits - torch.log(torch.exp(_logits).sum(1, keepdim=True))  # normalize
-        # print("log_prob.shape: ", log_prob.shape)  # log_prob.shape:  torch.Size([2, 512])
+        
+        ## self.wo_isがTrueなら重要度スコアによる補正をなくし，単純なプロトタイプベースの対照学習を実行
+        if not self.wo_is:
+            # (s_{i,j} - log())
+            _logits = logits - torch.log(_importance_weight) * all_mask
+            # print("_logits.shape: ", _logits.shape)    # _logits.shape:  torch.Size([2, 512])
+            log_prob = logits - torch.log(torch.exp(_logits).sum(1, keepdim=True))  # normalize
+            # print("log_prob.shape: ", log_prob.shape)  # log_prob.shape:  torch.Size([2, 512])
+        else:
+            log_prob = logits - torch.log(torch.exp(logits).sum(1, keepdim=True))
 
         if reduction == "mean":
             IS_supcon_loss = - (log_prob * mask).sum() / mask.sum()

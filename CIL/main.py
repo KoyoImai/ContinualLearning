@@ -99,6 +99,7 @@ def parse_option():
     parser.add_argument('--cosine', default=False, action='store_true')
     parser.add_argument('--lr_decay_rate', type=float, default=0.1,
                         help='decay rate for learning rate')
+    parser.add_argument('--wo_is', default=False, action='store_true')
     # parser.add_argument('--warm', action='store_true',
     #                     help='warm-up for large batch training')
 
