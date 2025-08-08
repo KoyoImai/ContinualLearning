@@ -458,13 +458,13 @@ def set_gradreplay_loader_cclis_cifar10(opt, normalize, replay_indices, method_t
     if training:
         train_loader = torch.utils.data.DataLoader(
                             train_dataset, batch_size=500, shuffle=(train_sampler is None),
-                            num_workers=opt.num_workers, pin_memory=True, sampler=train_sampler)
+                            num_workers=opt.num_workers, pin_memory=True, sampler=train_sampler, drop_last=False)
 
 
     else:
         train_loader = torch.utils.data.DataLoader(
                             train_dataset, batch_size=500, shuffle=False,
-                            num_workers=opt.num_workers, pin_memory=True)
+                            num_workers=opt.num_workers, pin_memory=True, drop_last=False)
         print('no separate sampler')
     
     return train_loader
