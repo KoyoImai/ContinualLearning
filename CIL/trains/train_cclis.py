@@ -642,7 +642,7 @@ def grad_analysis_distill(opt, model, model2, optimizer, criterion, grad_loader,
 
                 # --- ノルム集計（GPUで計算→tolistで一括CPU取り出し） ---
                 if grad_tensor.dim() == 4:
-                    # out_chごとに |.| を合計
+                    # out_chごとに ノルム を計算
                     abs_sum = grad_tensor.abs().view(grad_tensor.shape[0], -1).sum(dim=1)
                     for j, g in enumerate(abs_sum.tolist()):
                         key = (label_i, layer_name, param_type, str([j]))
