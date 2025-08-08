@@ -228,10 +228,6 @@ def train_cclis(opt, model, model2, criterion, optimizer, scheduler, train_loade
 import pandas as pd
 from collections import defaultdict
 
-
-
-
-
 ### ===================================================================================================================================================
 def write_full_grad_to_csv_by_column_from_sums(grad_sum_dict, grad_count_dict, output_path, epoch):
     rows = []
@@ -297,6 +293,11 @@ def grad_analysis_is_supcon(opt, model, optimizer, criterion, grad_loader, epoch
     param_index_map = {}       # i -> {layer, param_type, shape}
     named_trainable = [(n, p) for (n, p) in model.named_parameters() if p.requires_grad]
     for i, (name, param) in enumerate(named_trainable):
+
+        # print("name: ", name)                 # name:  encoder.conv1.weight
+        # print("param[0:5]: ", param[0:5])     #
+        # print("param.shape: ", param.shape)   # param.shape:  torch.Size([64, 3, 3, 3])
+
         layer_name = '.'.join(name.split('.')[:-1])
         param_type = name.split('.')[-1]
         grad_dims.append(param.data.numel())
@@ -306,6 +307,15 @@ def grad_analysis_is_supcon(opt, model, optimizer, criterion, grad_loader, epoch
             "shape": tuple(param.shape),
         }
     grad_total = sum(grad_dims)
+
+    # 形状確認
+    # print("grad_total: ", grad_total)                       # grad_total:  11498432
+    # print("len(param_index_map): ", len(param_index_map))   # len(param_index_map):  65
+    # print("param_index_map[0]: ", param_index_map[0])       # param_index_map[0]:  {'layer': 'encoder.conv1', 'param_type': 'weight', 'shape': (64, 3, 3, 3)}
+    # print("param_index_map[1]: ", param_index_map[1])       # param_index_map[1]:  {'layer': 'encoder.bn1', 'param_type': 'weight', 'shape': (64,)}
+    # print("param_index_map[2]: ", param_index_map[2])       # param_index_map[2]:  {'layer': 'encoder.bn1', 'param_type': 'bias', 'shape': (64,)}
+    # print("len(grad_dims): ", len(grad_dims))               # len(grad_dims):  65
+
 
     # === 学習ループ ===
     # for _, (images, labels, importance_weight, index) in enumerate(grad_loader):
@@ -343,7 +353,11 @@ def grad_analysis_is_supcon(opt, model, optimizer, criterion, grad_loader, epoch
 
         # === ラベルごとに backward → 勾配ベクトル化(GPU) → 再構築・集計 ===
         for label_i, indices in label_to_indices.items():
+
+            # label_i の損失のみを取り出して総和を計算
             loss_i = loss[indices].sum()
+
+            # 勾配の初期化と損失の逆伝搬
             optimizer.zero_grad(set_to_none=True)
             model.zero_grad(set_to_none=True)
             loss_i.backward(retain_graph=True)
@@ -351,6 +365,8 @@ def grad_analysis_is_supcon(opt, model, optimizer, criterion, grad_loader, epoch
             # 勾配を1本のベクトルに（GPU上）
             grads = torch.empty(grad_total, dtype=torch.float32, device=device)
             pointer = 0
+
+            # パラメータの勾配を1次元化して grads に格納
             for name, param in named_trainable:
                 n_params = param.data.numel()
                 if param.grad is not None:
@@ -363,11 +379,20 @@ def grad_analysis_is_supcon(opt, model, optimizer, criterion, grad_loader, epoch
             # ベクトルを各パラメータ形状に戻して、GPU上で集計
             pointer = 0
             for i, n_param in enumerate(grad_dims):
+
+                # grad_dims は各パラメータの要素数を格納したリスト
+                # print("len(grad_dims): ", len(grad_dims))   # len(grad_dims):  65
+
+                # パラメータのレイヤー名などを取り出す
                 meta = param_index_map[i]
                 layer_name = meta["layer"]
                 param_type = meta["param_type"]
                 shape = meta["shape"]
+                
+                # 確認
+                # print("shape: ", shape)
 
+                # meta が示す layer_name，param_type に該当する勾配を取り出し，形状を shape　を元に復元する
                 grad_tensor = grads[pointer:pointer + n_param].view(shape)
                 pointer += n_param
 
@@ -399,11 +424,18 @@ def grad_analysis_is_supcon(opt, model, optimizer, criterion, grad_loader, epoch
                 if CHANNEL_LIMIT is not None and grad_tensor.dim() >= 1 and grad_tensor.shape[0] > CHANNEL_LIMIT:
                     grad_tensor = grad_tensor[:CHANNEL_LIMIT]
 
+                # (アンカークラス，grad_dimsのインデックス)をキーとして使用
                 key_li = (label_i, i)
+                # print("key_li: ", key_li)   # key_li:  (1, 0)
+
+                # キー key_li が存在しなければ0埋めされたテンソルを作成
                 if key_li not in detail_sums:
                     detail_sums[key_li] = torch.zeros_like(grad_tensor, device=device)
+                
+                # キー key_l に対応したパラメータの勾配を累積する
                 detail_sums[key_li] += grad_tensor
                 detail_counts[key_li] += 1
+
 
     # === ノルムのCSV出力（従来形式） ===
     with open(grad_log_path, mode='a', newline='') as f:
@@ -418,10 +450,19 @@ def grad_analysis_is_supcon(opt, model, optimizer, criterion, grad_loader, epoch
     # === 詳細勾配：GPUで合算したテンソルを最後に一括でCPUへ → 行生成して保存 ===
     rows = []
     for (label_i, i), tensor_sum in detail_sums.items():
+
+        # パラメータのレイヤー名などを取り出す
         meta = param_index_map[i]
         layer_name = meta["layer"]; param_type = meta["param_type"]; shape = meta["shape"]
+
+        # カウント
         cnt = detail_counts[(label_i, i)]
+        
+        # 平均計算
         mean_tensor = (tensor_sum / cnt).detach().cpu().reshape(-1)
+
+        # 形状確認
+        # print("mean_tensor.shape: ", mean_tensor.shape)   # mean_tensor.shape:  torch.Size([1728])
 
         # flatten index -> multi-index に戻す
         for flat_idx, g in enumerate(mean_tensor.tolist()):
