@@ -108,7 +108,7 @@ def train_co2l(opt, model, model2, criterion, optimizer, scheduler, train_loader
 
     # 勾配分析（訓練用）
     if (opt.grad_analysis and epoch == opt.epochs-1) or (opt.grad_analysis and epoch % opt.grad_analysis_freq == 0):
-        # grad_analysis_supcon(opt, model, optimizer, criterion, gradreplay_train_loader, epoch)
+        grad_analysis_supcon(opt, model, optimizer, criterion, gradreplay_train_loader, epoch)
         if opt.target_task > 0:
             grad_analysis_distill(opt, model, model2, optimizer, criterion, gradreplay_train_loader, epoch)
         

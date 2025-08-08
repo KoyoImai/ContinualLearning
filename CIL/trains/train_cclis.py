@@ -208,8 +208,8 @@ def train_cclis(opt, model, model2, criterion, optimizer, scheduler, train_loade
 
     # 勾配分析（訓練用）
     if (opt.grad_analysis and epoch == opt.epochs-1) or (opt.grad_analysis and epoch % opt.grad_analysis_freq == 0):
-        # grad_analysis_is_supcon(opt=opt, model=model, optimizer=optimizer, criterion=criterion, grad_loader=gradreplay_train_loader, epoch=epoch,
-        #                         importance_weight=importance_weight, index=index, subset_sample_num=subset_sample_num, score_mask=score_mask)
+        grad_analysis_is_supcon(opt=opt, model=model, optimizer=optimizer, criterion=criterion, grad_loader=gradreplay_train_loader, epoch=epoch,
+                                importance_weight=importance_weight, index=index, subset_sample_num=subset_sample_num, score_mask=score_mask)
         if opt.target_task > 0:
             grad_analysis_distill(opt, model, model2, optimizer, criterion, gradreplay_train_loader, epoch, distill_type)
 
