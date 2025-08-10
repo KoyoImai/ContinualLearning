@@ -225,10 +225,6 @@ def grad_analysis_supcon(opt, model, optimizer, criterion, grad_loader, epoch):
         bsz = labels.shape[0]
         features, _ = model(images, return_feat=True)
 
-        # 現在タスクのラベル範囲
-        target_labels = list(range(opt.target_task * opt.cls_per_task,
-                                   (opt.target_task + 1) * opt.cls_per_task))
-
         f1, f2 = torch.split(features, [bsz, bsz], dim=0)
         features = torch.cat([f1.unsqueeze(1), f2.unsqueeze(1)], dim=1)
 
@@ -246,7 +242,8 @@ def grad_analysis_supcon(opt, model, optimizer, criterion, grad_loader, epoch):
         for label_i, indices in label_to_indices.items():
 
             # label_i の損失のみを取り出して総和を計算
-            loss_i = loss[indices].sum()
+            # loss_i = loss[indices].sum()
+            loss_i = loss[:, indices].sum()
 
             # 勾配の初期化と損失の逆伝搬
             optimizer.zero_grad(set_to_none=True)

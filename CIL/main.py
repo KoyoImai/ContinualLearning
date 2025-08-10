@@ -39,6 +39,7 @@ def parse_option():
     parser.add_argument('--data_folder', type=str, default='/home/kouyou/Datasets/', help='path to custom dataset')
     parser.add_argument('--dataset', type=str, default='cifar10',
                         choices=['cifar10', 'cifar100', 'tiny-imagenet', 'path'], help='dataset')
+    parser.add_argument('--data_order', type=str, default="original")
 
 
     # 最適化手法

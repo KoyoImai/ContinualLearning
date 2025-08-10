@@ -482,6 +482,54 @@ def set_gradreplay_loader_cclis_cifar10(opt, normalize, replay_indices, method_t
 
 
 
+# cifar100データセットのクラスをsuperclassに倣って変更
+# fine(0..99) -> coarse(0..19)
+groups = [
+    # 0: aquatic mammals
+    [4, 30, 55, 72, 95],
+    # 1: fish
+    [1, 32, 67, 73, 91],
+    # 2: flowers
+    [54, 62, 70, 82, 92],
+    # 3: food containers
+    [9, 10, 16, 28, 61],
+    # 4: fruit and vegetables
+    [0, 51, 53, 57, 83],
+    # 5: household electrical devices
+    [22, 39, 40, 86, 87],
+    # 6: household furniture
+    [5, 20, 25, 84, 94],
+    # 7: insects
+    [6, 7, 14, 18, 24],
+    # 8: large carnivores
+    [3, 42, 43, 88, 97],
+    # 9: large man-made outdoor things
+    [12, 17, 37, 68, 76],
+    # 10: large natural outdoor scenes
+    [23, 33, 49, 60, 71],
+    # 11: large omnivores and herbivores
+    [15, 19, 21, 31, 38],
+    # 12: medium-sized mammals
+    [34, 63, 64, 66, 75],
+    # 13: non-insect invertebrates
+    [26, 45, 77, 79, 99],
+    # 14: people
+    [2, 11, 35, 46, 98],
+    # 15: reptiles
+    [27, 29, 44, 78, 93],
+    # 16: small mammals
+    [36, 50, 65, 74, 80],
+    # 17: trees
+    [47, 52, 56, 59, 96],
+    # 18: vehicles 1
+    [8, 13, 48, 58, 90],
+    # 19: vehicles 2
+    [41, 69, 81, 85, 89],
+]
+
+
+
+
 
 
 
@@ -504,15 +552,38 @@ def set_loader_cclis_cifar100(opt, normalize, replay_indices, method_tools, trai
         normalize,
     ])
 
+    # 現在タスクで学習対象となるクラスリスト
     target_classes = list(range(opt.target_task*opt.cls_per_task, (opt.target_task+1)*opt.cls_per_task))
     print('target_classes', target_classes)
 
     subset_indices = []
     subset_importance_weight = []
 
+    # cifar100データセット
     _train_dataset = datasets.CIFAR100(root=opt.data_folder,
                                         transform=train_transform,
                                         download=True)
+    
+    # cifar100データセットのクラスを入れ替え
+    if opt.data_order == "sparse2coarse":
+
+        # cifar100のsuperclassに基づいて，クラスラベルを書き換える
+        # 水性哺乳類に含まれるクラス4, 30, 55, 72, 95を0, 1, 2, 3, 4に書き換える
+        # 魚に含まれるクラス1, 32, 67, 73, 91を5, 6, 7, 8, 9に書き換える
+        # 残りも同様に，，，，
+        remap = {}
+        for g_idx, fine_list in enumerate(groups):
+            base = g_idx * 5
+            for offset, old_label in enumerate(fine_list):
+                remap[old_label] = base + offset
+        
+        # _train_dataset.targets を新ラベルに書き換え
+        _train_dataset.targets = [remap[int(t)] for t in _train_dataset.targets]
+
+    elif opt.data_order == "original":
+        print("data order random")
+
+    
     for tc in target_classes:
         target_class_indices = np.where(np.array(_train_dataset.targets) == tc)[0]
         subset_indices += np.where(np.array(_train_dataset.targets) == tc)[0].tolist()  # cur_sample index, list
@@ -601,6 +672,21 @@ def set_grad_loader_cclis_cifar100(opt, train, normalize, method_tools):
                                            train=train,
                                            transform=train_transform,
                                            download=True)
+
+        # cifar100データセットのクラスを入れ替え
+        if opt.data_order == "sparse2coarse":
+
+            remap = {}
+            for g_idx, fine_list in enumerate(groups):
+                base = g_idx * 5
+                for offset, old_label in enumerate(fine_list):
+                    remap[old_label] = base + offset
+            
+            # _train_dataset.targets を新ラベルに書き換え
+            _train_dataset.targets = [remap[int(t)] for t in _train_dataset.targets]
+
+        elif opt.data_order == "original":
+            print("data order random")
         
         target_class_indices = np.where(np.array(_train_dataset.targets) == tc)[0]
 
@@ -656,6 +742,25 @@ def set_gradtask_loader_cclis_cifar100(opt, train, normalize, method_tools):
                                            train=train,
                                            transform=train_transform,
                                            download=True)
+
+        # cifar100データセットのクラスを入れ替え
+        if opt.data_order == "sparse2coarse":
+
+            # cifar100のsuperclassに基づいて，クラスラベルを書き換える
+            # 水性哺乳類に含まれるクラス4, 30, 55, 72, 95を0, 1, 2, 3, 4に書き換える
+            # 魚に含まれるクラス1, 32, 67, 73, 91を5, 6, 7, 8, 9に書き換える
+            # 残りも同様に，，，，
+            remap = {}
+            for g_idx, fine_list in enumerate(groups):
+                base = g_idx * 5
+                for offset, old_label in enumerate(fine_list):
+                    remap[old_label] = base + offset
+            
+            # _train_dataset.targets を新ラベルに書き換え
+            _train_dataset.targets = [remap[int(t)] for t in _train_dataset.targets]
+
+        elif opt.data_order == "original":
+            print("data order random")
         
         for tc in target_classes:
             subset_indices += np.where(np.array(_train_dataset.targets) == tc)[0].tolist()  # cur_sample index, list
@@ -706,6 +811,25 @@ def set_gradreplay_loader_cclis_cifar100(opt, normalize, replay_indices, method_
                                        train=training,
                                        transform=train_transform,
                                        download=True)
+    
+    # cifar100データセットのクラスを入れ替え
+    if opt.data_order == "sparse2coarse":
+
+        # cifar100のsuperclassに基づいて，クラスラベルを書き換える
+        # 水性哺乳類に含まれるクラス4, 30, 55, 72, 95を0, 1, 2, 3, 4に書き換える
+        # 魚に含まれるクラス1, 32, 67, 73, 91を5, 6, 7, 8, 9に書き換える
+        # 残りも同様に，，，，
+        remap = {}
+        for g_idx, fine_list in enumerate(groups):
+            base = g_idx * 5
+            for offset, old_label in enumerate(fine_list):
+                remap[old_label] = base + offset
+        
+        # _train_dataset.targets を新ラベルに書き換え
+        _train_dataset.targets = [remap[int(t)] for t in _train_dataset.targets]
+
+    elif opt.data_order == "original":
+        print("data order random")
     
     for tc in target_classes:
         target_class_indices = np.where(np.array(_train_dataset.targets) == tc)[0]
