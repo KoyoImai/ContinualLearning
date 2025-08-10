@@ -166,7 +166,7 @@ def param_should_record(layer_name, param_type):
         return False
     return True
 # 先頭チャネルを絞りたいとき用（None なら全チャネル）
-CHANNEL_LIMIT = None  # 例: 5 にすると先頭5チャネルだけにスライス
+CHANNEL_LIMIT = None   # 例: 5 にすると先頭5チャネルだけにスライス
 
 
 def grad_analysis_supcon(opt, model, optimizer, criterion, grad_loader, epoch):
@@ -335,7 +335,9 @@ def grad_analysis_supcon(opt, model, optimizer, criterion, grad_loader, epoch):
                 
                 # キー key_l に対応したパラメータの勾配を累積する
                 detail_sums[key_li] += grad_tensor
-                detail_counts[key_li] += 1
+                # detail_counts[key_li] += 1
+                detail_counts[key_li] += n_anchor 
+
 
 
     # === ノルムのCSV出力（従来形式） ===
@@ -592,7 +594,8 @@ def grad_analysis_distill(opt, model, model2, optimizer, criterion, grad_loader,
                 
                 # キー key_l に対応したパラメータの勾配を累積する
                 detail_sums[key_li] += grad_tensor
-                detail_counts[key_li] += 1
+                # detail_counts[key_li] += 1
+                detail_counts[key_li] += n_anchor 
 
 
     # === ノルムのCSV出力（従来形式） ===
