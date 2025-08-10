@@ -208,10 +208,18 @@ def train_cclis(opt, model, model2, criterion, optimizer, scheduler, train_loade
 
     # 勾配分析（訓練用）
     if (opt.grad_analysis and epoch == opt.epochs-1) or (opt.grad_analysis and epoch % opt.grad_analysis_freq == 0):
+
+        # modelをtrainモードからevalモードに
+        model.eval()
+        
         grad_analysis_is_supcon(opt=opt, model=model, optimizer=optimizer, criterion=criterion, grad_loader=gradreplay_train_loader, epoch=epoch,
                                 importance_weight=importance_weight, index=index, subset_sample_num=subset_sample_num, score_mask=score_mask)
         if opt.target_task > 0:
             grad_analysis_distill(opt, model, model2, optimizer, criterion, gradreplay_train_loader, epoch, distill_type)
+        
+        # modelをtrainモードに直す
+        model.train()
+
 
     return losses.avg, model2
 
@@ -322,13 +330,24 @@ def grad_analysis_is_supcon(opt, model, optimizer, criterion, grad_loader, epoch
         device = images.device
 
         # prototypes の正規化
-        with torch.no_grad():
-            w = model.prototypes.weight.data.clone()
-            w = torch.nn.functional.normalize(w, dim=1, p=2)
-            model.prototypes.weight.copy_(w)
+        # with torch.no_grad():
+        #     w = model.prototypes.weight.data.clone()
+        #     w = torch.nn.functional.normalize(w, dim=1, p=2)
+        #     model.prototypes.weight.copy_(w)
 
         # forward
-        features, output = model(images)
+        # features, output = model(images)
+        features, _ = model(images)
+
+
+        proto_w_n  = F.normalize(model.prototypes.weight, dim=1, p=2)
+        output = F.linear(features, proto_w_n).T
+
+        # print("output[0:5]: ", output[0:5])
+        # print("output2.T[0:5]: ", output2.T[0:5])
+        # print("output.shape: ", output.shape)
+        # print("output2.shape: ", output2.shape)
+
 
         # 現在タスクのラベル範囲
         target_labels = list(range(opt.target_task * opt.cls_per_task,
@@ -351,6 +370,9 @@ def grad_analysis_is_supcon(opt, model, optimizer, criterion, grad_loader, epoch
 
             # label_i の損失のみを取り出して総和を計算
             loss_i = loss[indices].sum()
+
+            # アンカーの数
+            n_anchor = len(indices) 
 
             # 勾配の初期化と損失の逆伝搬
             optimizer.zero_grad(set_to_none=True)
@@ -398,18 +420,22 @@ def grad_analysis_is_supcon(opt, model, optimizer, criterion, grad_loader, epoch
                     for j, g in enumerate(abs_sum.tolist()):
                         key = (label_i, layer_name, param_type, str([j]))
                         grad_sum_dict[key] += g
-                        grad_count_dict[key] += 1
+                        # grad_count_dict[key] += 1
+                        grad_count_dict[key] += n_anchor 
                 elif grad_tensor.dim() == 2:
                     abs_sum = grad_tensor.abs().sum(dim=1)
                     for j, g in enumerate(abs_sum.tolist()):
                         key = (label_i, layer_name, param_type, str([j]))
                         grad_sum_dict[key] += g
-                        grad_count_dict[key] += 1
+                        # grad_count_dict[key] += 1
+                        grad_count_dict[key] += n_anchor 
                 elif grad_tensor.dim() == 1:
                     for j, g in enumerate(grad_tensor.abs().tolist()):
                         key = (label_i, layer_name, param_type, str([j]))
                         grad_sum_dict[key] += g
-                        grad_count_dict[key] += 1
+                        # grad_count_dict[key] += 1
+                        grad_count_dict[key] += n_anchor 
+
 
                 # --- 詳細勾配：要素ごと辞書更新をやめ、テンソル合算に切替 ---
                 if not param_should_record(layer_name, param_type):
@@ -436,20 +462,21 @@ def grad_analysis_is_supcon(opt, model, optimizer, criterion, grad_loader, epoch
     with open(grad_log_path, mode='a', newline='') as f:
         writer = csv.writer(f)
         if is_new_log_file:
-            writer.writerow(['current task', 'epoch', 'anchor_label', 'layer', 'param_type', 'index', 'grad_sum', 'grad_mean'])
+            writer.writerow(['current task', 'epoch', 'anchor_label', 'layer', 'param_type', 'index', 'grad_count', 'grad_sum', 'grad_mean'])
         for key, grad_sum in grad_sum_dict.items():
+
+            cnt = grad_count_dict[key]
 
             # 平均計算
             # grad_mean = grad_sum / len(grad_loader.dataset)   # データセット全体で平均を計算
-            grad_mean = grad_sum / grad_count_dict[key]       # key の出現回数で平均を計算
-            
+            grad_mean = grad_sum / cnt                         # key の出現回数で平均を計算
+
             label_i, layer_name, param_type, index_str = key
-            writer.writerow([opt.target_task, epoch, label_i, layer_name, param_type, index_str, grad_sum, grad_mean])
+            writer.writerow([opt.target_task, epoch, label_i, layer_name, param_type, index_str, cnt, grad_sum, grad_mean])
 
     
     # === 詳細勾配：GPUで合算したテンソルを最後に一括でCPUへ → 行生成して保存 ===
     rows = []
-    dataset_size = len(grad_loader.dataset)
     for (label_i, i), tensor_sum in detail_sums.items():
 
         # パラメータのレイヤー名などを取り出す
@@ -459,20 +486,23 @@ def grad_analysis_is_supcon(opt, model, optimizer, criterion, grad_loader, epoch
         # カウント
         cnt = detail_counts[(label_i, i)]
         
-        # 平均計算
-        mean_tensor = (tensor_sum / cnt).detach().cpu().reshape(-1)
-        grad_mean_count = grad_sum / max(cnt, 1)
-        grad_mean_dataset = grad_sum / max(dataset_size, 1)
+        # 平均計算と総和取り出し
+        # mean_tensor = (tensor_sum / cnt).detach().cpu().reshape(-1)
+        sum_tensor = tensor_sum.detach().cpu().reshape(-1)
+
 
         # 形状確認
         # print("mean_tensor.shape: ", mean_tensor.shape)   # mean_tensor.shape:  torch.Size([1728])
 
         # flatten index -> multi-index に戻す
-        for flat_idx, g in enumerate(mean_tensor.tolist()):
+        for flat_idx, g in enumerate(sum_tensor.tolist()):
             idx_tuple = np.unravel_index(flat_idx, shape)
+
             rows.append([label_i, layer_name, param_type, str(list(idx_tuple)), g])
 
+
     write_full_grad_to_csv_from_rows(rows, full_grad_log_path, epoch)
+
 
 
 
@@ -601,6 +631,9 @@ def grad_analysis_distill(opt, model, model2, optimizer, criterion, grad_loader,
             # label_i の損失のみを取り出して総和を計算
             loss_i = loss[indices].sum()
 
+            # アンカーの数
+            n_anchor = len(indices)
+
             # 勾配の初期化と損失の逆伝搬
             optimizer.zero_grad(set_to_none=True)
             model.zero_grad(set_to_none=True)
@@ -642,23 +675,26 @@ def grad_analysis_distill(opt, model, model2, optimizer, criterion, grad_loader,
 
                 # --- ノルム集計（GPUで計算→tolistで一括CPU取り出し） ---
                 if grad_tensor.dim() == 4:
-                    # out_chごとに ノルム を計算
+                    # out_chごとに |.| を合計
                     abs_sum = grad_tensor.abs().view(grad_tensor.shape[0], -1).sum(dim=1)
                     for j, g in enumerate(abs_sum.tolist()):
                         key = (label_i, layer_name, param_type, str([j]))
                         grad_sum_dict[key] += g
-                        grad_count_dict[key] += 1
+                        # grad_count_dict[key] += 1
+                        grad_count_dict[key] += n_anchor 
                 elif grad_tensor.dim() == 2:
                     abs_sum = grad_tensor.abs().sum(dim=1)
                     for j, g in enumerate(abs_sum.tolist()):
                         key = (label_i, layer_name, param_type, str([j]))
                         grad_sum_dict[key] += g
-                        grad_count_dict[key] += 1
+                        # grad_count_dict[key] += 1
+                        grad_count_dict[key] += n_anchor 
                 elif grad_tensor.dim() == 1:
                     for j, g in enumerate(grad_tensor.abs().tolist()):
                         key = (label_i, layer_name, param_type, str([j]))
                         grad_sum_dict[key] += g
-                        grad_count_dict[key] += 1
+                        # grad_count_dict[key] += 1
+                        grad_count_dict[key] += n_anchor 
 
                 # --- 詳細勾配：要素ごと辞書更新をやめ、テンソル合算に切替 ---
                 if not param_should_record(layer_name, param_type):
@@ -685,20 +721,21 @@ def grad_analysis_distill(opt, model, model2, optimizer, criterion, grad_loader,
     with open(grad_log_path, mode='a', newline='') as f:
         writer = csv.writer(f)
         if is_new_log_file:
-            writer.writerow(['current task', 'epoch', 'anchor_label', 'layer', 'param_type', 'index', 'grad_sum', 'grad_mean'])
+            writer.writerow(['current task', 'epoch', 'anchor_label', 'layer', 'param_type', 'index', 'grad_count', 'grad_sum', 'grad_mean'])
         for key, grad_sum in grad_sum_dict.items():
+
+            cnt = grad_count_dict[key]
 
             # 平均計算
             # grad_mean = grad_sum / len(grad_loader.dataset)   # データセット全体で平均を計算
-            grad_mean = grad_sum / grad_count_dict[key]       # key の出現回数で平均を計算
+            grad_mean = grad_sum / cnt                         # key の出現回数で平均を計算
 
             label_i, layer_name, param_type, index_str = key
-            writer.writerow([opt.target_task, epoch, label_i, layer_name, param_type, index_str, grad_sum, grad_mean])
+            writer.writerow([opt.target_task, epoch, label_i, layer_name, param_type, index_str, cnt, grad_sum, grad_mean])
 
     
     # === 詳細勾配：GPUで合算したテンソルを最後に一括でCPUへ → 行生成して保存 ===
     rows = []
-    dataset_size = len(grad_loader.dataset)
     for (label_i, i), tensor_sum in detail_sums.items():
 
         # パラメータのレイヤー名などを取り出す
@@ -708,18 +745,20 @@ def grad_analysis_distill(opt, model, model2, optimizer, criterion, grad_loader,
         # カウント
         cnt = detail_counts[(label_i, i)]
         
-        # 平均計算
-        mean_tensor = (tensor_sum / cnt).detach().cpu().reshape(-1)
-        grad_mean_count = grad_sum / max(cnt, 1)
-        grad_mean_dataset = grad_sum / max(dataset_size, 1)
+        # 平均計算と総和取り出し
+        # mean_tensor = (tensor_sum / cnt).detach().cpu().reshape(-1)
+        sum_tensor = tensor_sum.detach().cpu().reshape(-1)
+
 
         # 形状確認
         # print("mean_tensor.shape: ", mean_tensor.shape)   # mean_tensor.shape:  torch.Size([1728])
 
         # flatten index -> multi-index に戻す
-        for flat_idx, g in enumerate(mean_tensor.tolist()):
+        for flat_idx, g in enumerate(sum_tensor.tolist()):
             idx_tuple = np.unravel_index(flat_idx, shape)
+
             rows.append([label_i, layer_name, param_type, str(list(idx_tuple)), g])
+
 
     write_full_grad_to_csv_from_rows(rows, full_grad_log_path, epoch)
 
@@ -845,6 +884,8 @@ def val_cclis(opt, model, model2, linear_loader, val_loader, taskil_loaders, epo
     classil_acc = np.sum(corr)/np.sum(cnt)*100.
     taskil_acc = correct_task/np.sum(cnt)*100.
     return classil_acc, taskil_acc, all_task_accuracies, all_task_losses
+
+
 
 
 def taskil_val_cclis(opt, model, classifier,  criterion, val_loaders):
