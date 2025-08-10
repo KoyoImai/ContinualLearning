@@ -172,7 +172,7 @@ def preparation(opt):
         if opt.offline:
             opt.cls_per_task = 100
         else:
-            opt.cls_per_task = 10
+            opt.cls_per_task = 5
         opt.size = 32
     elif opt.dataset == 'tiny-imagenet':
         opt.n_cls = 200
