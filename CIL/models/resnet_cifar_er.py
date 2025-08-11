@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import copy 
+
 
 from util import seed_everything
 
@@ -159,19 +161,50 @@ class LinearBatchNorm(nn.Module):
         return x
 
 
+class SimpleLinear(nn.Module):
+    '''
+    Reference:
+    https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/linear.py
+    '''
+    def __init__(self, in_features, out_features, bias=True):
+        super(SimpleLinear, self).__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.weight = nn.Parameter(torch.Tensor(out_features, in_features))
+        if bias:
+            self.bias = nn.Parameter(torch.Tensor(out_features))
+        else:
+            self.register_parameter('bias', None)
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        nn.init.kaiming_uniform_(self.weight, nonlinearity='linear')
+        nn.init.constant_(self.bias, 0)
+
+    def forward(self, input):
+        return F.linear(input, self.weight, self.bias)
+
+
+
 class BackboneResNet(nn.Module):
     """backbone + projection head"""
-    def __init__(self, name='resnet50', head='mlp', feat_dim=128, seed=777):
+    def __init__(self, name='resnet50', head='mlp', feat_dim=128, seed=777, opt=None):
         super(BackboneResNet, self).__init__()
 
         seed_everything(seed=seed)
 
         model_fun, dim_in = model_dict[name]
+        self.dim_in = dim_in
         self.encoder = model_fun()
+
+        self.opt = opt
 
         #  交差エントロピー損失などはlinear
         if head == 'linear':
-            self.head = nn.Linear(dim_in, feat_dim)
+
+            # 最初のfc層は opt.cls_per_task の出力のみ
+            # self.head = nn.Linear(dim_in, opt.cls_per_task)
+            self.head = SimpleLinear(dim_in, opt.cls_per_task)
         
         # Contrastive Lossなどはmlp
         elif head == 'mlp':
@@ -189,6 +222,32 @@ class BackboneResNet(nn.Module):
             if hasattr(layers, 'reset_parameters'):
                 layers.reset_parameters()
 
+    def update_fc(self):
+
+        # 新しいタスクのクラス数
+        num_classes = (self.opt.target_task + 1) * self.opt.cls_per_task
+
+        # 新しいクラス数に合わせてfc層を構築
+        new_fc = self.generate_fc(self.dim_in, num_classes)
+
+        if self.head is not None:
+            nb_output = self.head.out_features
+            weight = copy.deepcopy(self.head.weight.data)
+            bias = copy.deepcopy(self.head.bias.data)
+            new_fc.weight.data[:nb_output] = weight
+            new_fc.bias.data[:nb_output] = bias
+
+        del self.head
+        self.head = new_fc
+
+        return list(self.head.parameters())
+
+
+    
+    def generate_fc(self, in_dim, out_dim):
+        fc = SimpleLinear(in_dim, out_dim)
+
+        return fc
 
     def forward(self, x, return_feat=False, norm=True):
         encoded = self.encoder(x)

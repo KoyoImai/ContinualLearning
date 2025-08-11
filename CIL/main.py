@@ -221,7 +221,7 @@ def make_setup(opt):
         elif opt.dataset in ["imagemet"]:
             assert False
         
-        model = BackboneResNet(name='resnet18', head='linear', feat_dim=opt.n_cls, seed=opt.seed)
+        model = BackboneResNet(name='resnet18', head='linear', feat_dim=opt.n_cls, seed=opt.seed, opt=opt)
         print("model: ", model)
         # assert False
         model2 = None
@@ -231,6 +231,7 @@ def make_setup(opt):
                               momentum=opt.momentum,
                               weight_decay=opt.weight_decay)
         method_tools = {"optimizer": optimizer}
+
     
     elif opt.method == "co2l":
 

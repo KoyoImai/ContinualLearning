@@ -153,6 +153,7 @@ def set_loader_cclis_cifar10(opt, normalize, replay_indices, method_tools, train
 
         train_dataset = ConcatDataset([prev_dataset, cur_dataset])
 
+
     else:
         _subset_indices += replay_indices
         _subset_importance_weight += importance_weight
@@ -188,6 +189,15 @@ def set_loader_cclis_cifar10(opt, normalize, replay_indices, method_tools, train
                             train_dataset, batch_size=opt.batch_size, shuffle=False,
                             num_workers=opt.num_workers, pin_memory=True)
         print('no separate sampler')
+    
+
+    # Samplerが正しく機能しているかの確認
+    # for b, (imgs, labels, _, idxs) in enumerate(train_loader):
+
+    #     # 2) クラス別枚数
+    #     uniq, cnt = labels.unique(return_counts=True)
+    #     print("  class_counts:", dict(zip(uniq.tolist(), cnt.tolist())))
+
     
     return train_loader, subset_indices, replay_sample_num
 

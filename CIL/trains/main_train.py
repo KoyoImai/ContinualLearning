@@ -60,8 +60,6 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
                     ClassIL_accuracy={classil_acc:.3f}, TaskIL_accuracy={taskil_acc:.3f}, NCM_accuracy={ncm_acc:.3f}, \
                     {taskil_acc_str}")
 
-
-
     elif opt.method == "co2l":
         
         loss, model2 = train_co2l(opt=opt, model=model, model2=model2,

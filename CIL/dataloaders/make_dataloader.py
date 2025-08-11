@@ -282,18 +282,24 @@ def set_loader(opt, replay_indices, method_tools):
     # 特定の1クラスのみを含むデータローダーをリストに格納して返す（er） or 全てのデータを含むデータローダーを返す（co2l, cclis）
     if opt.method in ["er"]:
         if opt.dataset == "cifar10":
-            grad_val_loaders = set_gard_loader_er_cifar10(opt=opt, train=False, normalize=normalize)
+            # grad_val_loaders = set_gard_loader_er_cifar10(opt=opt, train=False, normalize=normalize)
+            grad_val_loaders = None
         elif opt.dataset == "cifar100": 
-            grad_val_loaders = set_gard_loader_er_cifar100(opt=opt, train=False, normalize=normalize)
+            # grad_val_loaders = set_gard_loader_er_cifar100(opt=opt, train=False, normalize=normalize)
+            grad_val_loaders = None
         elif opt.dataset == "tiny-imagenet":
-            grad_val_loaders = set_grad_loader_er_tinyimagenet(opt=opt, train=False, normalize=normalize)
+            # grad_val_loaders = set_grad_loader_er_tinyimagenet(opt=opt, train=False, normalize=normalize)
+            grad_val_loaders = None
 
         if opt.dataset == "cifar10":
-            grad_train_loaders = set_gard_loader_er_cifar10(opt=opt, train=True, normalize=normalize)
+            # grad_train_loaders = set_gard_loader_er_cifar10(opt=opt, train=True, normalize=normalize)
+            grad_train_loaders = None
         elif opt.dataset == "cifar100":
-            grad_train_loaders = set_gard_loader_er_cifar100(opt=opt, train=True, normalize=normalize)
+            # grad_train_loaders = set_gard_loader_er_cifar100(opt=opt, train=True, normalize=normalize)
+            grad_train_loaders = None
         elif opt.dataset == "tiny-imagenet":
-            grad_train_loaders = set_grad_loader_er_tinyimagenet(opt=opt, train=True, normalize=normalize)
+            # grad_train_loaders = set_grad_loader_er_tinyimagenet(opt=opt, train=True, normalize=normalize)
+            grad_train_loaders = None
     
     elif opt.method in ["co2l", "supcon"]:
 
@@ -340,18 +346,23 @@ def set_loader(opt, replay_indices, method_tools):
     # 特定の1タスクのみを含むデータローダーをリストに格納して返す
     if opt.method in ["er"]:
         if opt.dataset == "cifar10":
-            grad_val_loaders = set_gardtask_loader_er_cifar10(opt=opt, train=False, normalize=normalize)
+            # grad_val_loaders = set_gardtask_loader_er_cifar10(opt=opt, train=False, normalize=normalize)
+            grad_val_loaders = None
         elif opt.dataset == "cifar100": 
-            grad_val_loaders = set_gardtask_loader_er_cifar100(opt=opt, train=False, normalize=normalize)
+            # grad_val_loaders = set_gardtask_loader_er_cifar100(opt=opt, train=False, normalize=normalize)
+            grad_val_loaders = None
         elif opt.dataset == "tiny-imagenet":
-            grad_val_loaders = set_gardtask_loader_er_tinyimagenet(opt=opt, train=False, normalize=normalize)
-
+            # grad_val_loaders = set_gardtask_loader_er_tinyimagenet(opt=opt, train=False, normalize=normalize)
+            grad_val_loaders = None
         if opt.dataset == "cifar10":
-            grad_train_loaders = set_gardtask_loader_er_cifar10(opt=opt, train=True, normalize=normalize)
+            # grad_train_loaders = set_gardtask_loader_er_cifar10(opt=opt, train=True, normalize=normalize)
+            grad_train_loaders = None
         elif opt.dataset == "cifar100":
-            grad_train_loaders = set_gardtask_loader_er_cifar100(opt=opt, train=True, normalize=normalize)
+            # grad_train_loaders = set_gardtask_loader_er_cifar100(opt=opt, train=True, normalize=normalize)
+            grad_train_loaders = None
         elif opt.dataset == "tiny-imagenet":
-            grad_train_loaders = set_gardtask_loader_er_tinyimagenet(opt=opt, train=True, normalize=normalize)
+            # grad_train_loaders = set_gardtask_loader_er_tinyimagenet(opt=opt, train=True, normalize=normalize)
+            grad_train_loaders = None
 
     elif opt.method in ["co2l", "supcon"]:
         
