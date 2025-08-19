@@ -293,7 +293,7 @@ def set_ncmloader_er_cifar10(opt, normalize, replay_indices):
 
 
 # task-il 検証用cifar10
-def set_taskil_valloader_er_cifar10(opt, normalize):
+def set_taskil_valloader_er_cifar10(opt, normalize, train=False):
 
     val_transform = transforms.Compose([
         transforms.Resize(size=(opt.size, opt.size)),
@@ -308,7 +308,7 @@ def set_taskil_valloader_er_cifar10(opt, normalize):
 
         subset_indices = []
         _val_dataset = datasets.CIFAR10(root=opt.data_folder,
-                                        train=False,
+                                        train=train,
                                         transform=val_transform)
         for tc in target_classes:
             subset_indices += np.where(np.array(_val_dataset.targets) == tc)[0].tolist()
@@ -695,7 +695,7 @@ def set_ncmloader_er_cifar100(opt, normalize, replay_indices):
 
 
 # 検証用cifar100
-def set_taskil_valloader_er_cifar100(opt, normalize):
+def set_taskil_valloader_er_cifar100(opt, normalize, train=False):
 
     train_transform = transforms.Compose([
         transforms.Resize(size=(opt.size, opt.size)),
@@ -711,7 +711,7 @@ def set_taskil_valloader_er_cifar100(opt, normalize):
 
         subset_indices = []
         _val_dataset = datasets.CIFAR100(root=opt.data_folder,
-                                         train=False,
+                                         train=train,
                                          transform=train_transform)
         
         for tc in target_classes:
@@ -1058,7 +1058,7 @@ def set_ncmloader_er_tinyimagenet(opt, normalize, replay_indices):
 
 
 # taskil 検証用tiny-imagenet
-def set_taskil_valloader_er_tinyimagenet(opt, normalize):
+def set_taskil_valloader_er_tinyimagenet(opt, normalize, train=False):
 
     val_transform = transforms.Compose([
         transforms.Resize(size=(opt.size, opt.size)),
@@ -1074,7 +1074,7 @@ def set_taskil_valloader_er_tinyimagenet(opt, normalize):
 
         subset_indices = []
         _val_dataset = TinyImagenet(root=opt.data_folder,
-                                        train=False,
+                                        train=train,
                                         transform=val_transform)
         for tc in target_classes:
             subset_indices += np.where(np.array(_val_dataset.targets) == tc)[0].tolist()

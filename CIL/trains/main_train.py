@@ -36,7 +36,7 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
     gradtask_val_loaders = dataloader["gradtask_val"]
     gradreplay_train_loader = dataloader["gradreplay_train"]
     gradreplay_val_loader = dataloader["gradreplay_val"]
-
+    knn_train_loaders = dataloader["knn_train"]
 
     
     if opt.method == "er":
@@ -62,22 +62,23 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
 
     elif opt.method == "co2l":
         
-        loss, model2 = train_co2l(opt=opt, model=model, model2=model2,
-                                  criterion=criterion, optimizer=optimizer,
-                                  scheduler=scheduler, train_loader=train_loader,
-                                  grad_train_loaders=grad_train_loaders, grad_val_loaders=grad_val_loaders,
-                                  gradtask_train_loaders=gradtask_train_loaders, gradtask_val_loaders=gradtask_val_loaders,
-                                  gradreplay_train_loader=gradreplay_train_loader, gradreplay_val_loader=gradreplay_val_loader, epoch=epoch)
-        if epoch % 50 == 0:
-            classil_acc, taskil_acc, all_task_accuracies, all_task_losses = val_co2l(opt, model, model2, linear_loader, val_loader, taskil_loaders, epoch)
+        # loss, model2 = train_co2l(opt=opt, model=model, model2=model2,
+        #                           criterion=criterion, optimizer=optimizer,
+        #                           scheduler=scheduler, train_loader=train_loader,
+        #                           grad_train_loaders=grad_train_loaders, grad_val_loaders=grad_val_loaders,
+        #                           gradtask_train_loaders=gradtask_train_loaders, gradtask_val_loaders=gradtask_val_loaders,
+        #                           gradreplay_train_loader=gradreplay_train_loader, gradreplay_val_loader=gradreplay_val_loader, epoch=epoch)
+        if epoch % 1 == 0:
+            classil_acc, taskil_acc, all_task_accuracies, all_task_losses = val_co2l(opt, model, model2, linear_loader, val_loader, taskil_loaders, knn_train_loaders, epoch)
             # 各タスクの精度を「task0 acc=100.00, task1 acc=90.00」の形式で整形
             taskil_acc_str = ', '.join([f"task{i} acc={acc:.2f}" for i, acc in enumerate(all_task_accuracies)])
+            taskil_knnacc_str = ', '.join([f"task{i} knnacc={acc:.2f}" for i, acc in enumerate(all_task_knn_accuracies)])
 
             ncm_acc = ncm_co2l(model, ncm_loader, val_loader)
 
             logger.info(f"task {opt.target_task} Epoch {epoch}: train_loss={loss:.4f}, \
                         ClassIL_accuracy={classil_acc:.3f}, TaskIL_accuracy={taskil_acc:.3f}, NCM_accuracy={ncm_acc:.3f}, \
-                        {taskil_acc_str}")
+                        {taskil_acc_str}, {taskil_knnacc_str}")
     
     elif opt.method == "gpm":
 
@@ -144,16 +145,17 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
                                    grad_train_loaders=grad_train_loaders, grad_val_loaders=grad_val_loaders,
                                    gradtask_train_loaders=gradtask_train_loaders, gradtask_val_loaders=gradtask_val_loaders,
                                    gradreplay_train_loader=gradreplay_train_loader, gradreplay_val_loader=gradreplay_val_loader)
-        if epoch % 50 == 0:
-            classil_acc, taskil_acc, all_task_accuracies, all_task_losses = val_cclis(opt, model, model2, linear_loader, val_loader, taskil_loaders, epoch)
+        if epoch % 1 == 0:
+            classil_acc, taskil_acc, all_task_accuracies, all_task_knn_accuracies, all_task_losses = val_cclis(opt, model, model2, linear_loader, val_loader, taskil_loaders, knn_train_loaders, epoch)
             # 各タスクの精度を「task0 acc=100.00, task1 acc=90.00」の形式で整形
             taskil_acc_str = ', '.join([f"task{i} acc={acc:.2f}" for i, acc in enumerate(all_task_accuracies)])
+            taskil_knnacc_str = ', '.join([f"task{i} knnacc={acc:.2f}" for i, acc in enumerate(all_task_knn_accuracies)])
 
             ncm_acc = ncm_cclis(model, ncm_loader, val_loader)
 
             logger.info(f"task {opt.target_task} Epoch {epoch}: train_loss={loss:.4f}, \
                         ClassIL_accuracy={classil_acc:.3f}, TaskIL_accuracy={taskil_acc:.3f}, NCM_accuracy={ncm_acc:.3f}, \
-                        {taskil_acc_str}")
+                        {taskil_acc_str}, {taskil_knnacc_str}")
     
     elif opt.method in ["supcon-joint", "supcon"]:
 

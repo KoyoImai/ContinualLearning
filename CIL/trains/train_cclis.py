@@ -16,6 +16,8 @@ import torch.optim.lr_scheduler as lr_scheduler
 from util import AverageMeter
 from models.resnet_cifar_co2l import LinearClassifier
 
+from sklearn.neighbors import KNeighborsClassifier
+
 logger = logging.getLogger(__name__)
 
 
@@ -1317,7 +1319,7 @@ def grad_analysis_distill(opt, model, model2, optimizer, criterion, grad_loader,
 
 
 
-def val_cclis(opt, model, model2, linear_loader, val_loader, taskil_loaders, epoch):
+def val_cclis(opt, model, model2, linear_loader, val_loader, taskil_loaders, knn_train_loaders, epoch):
 
     # classifierの準備
     classifier = LinearClassifier(name="resnet18", num_classes=opt.n_cls, seed=opt.seed)
@@ -1430,12 +1432,12 @@ def val_cclis(opt, model, model2, linear_loader, val_loader, taskil_loaders, epo
 
     # 検証（これまで学習した各タスク毎に）
     all_task_accuracies, all_task_losses = taskil_val_cclis(opt, model, classifier, criterion, taskil_loaders)
+    all_task_knn_accuracies = knn_val_cclis(opt, model, taskil_loaders, knn_train_loaders)
+    print("all_task_knn_accuracies: ", all_task_knn_accuracies)
 
     classil_acc = np.sum(corr)/np.sum(cnt)*100.
     taskil_acc = correct_task/np.sum(cnt)*100.
-    return classil_acc, taskil_acc, all_task_accuracies, all_task_losses
-
-
+    return classil_acc, taskil_acc, all_task_accuracies, all_task_knn_accuracies, all_task_losses
 
 
 def taskil_val_cclis(opt, model, classifier,  criterion, val_loaders):
@@ -1502,6 +1504,174 @@ def taskil_val_cclis(opt, model, classifier,  criterion, val_loaders):
         print(f"[Task {taskid}] Loss: {losses.avg:.4f}, Accuracy: {task_accuracy:.2f}%")
 
     return all_task_accuracies, all_task_losses
+
+
+
+
+def knn_eval(test_embeddings, test_labels, knn_train_embeddings, knn_train_labels, args):
+    
+    if args.dataset == 'cifar100':
+        n_neighbors = 101
+    elif args.dataset == 'cifar10':
+        n_neighbors = 101
+    else:
+        assert False
+    
+    def to_numpy(x):
+        if isinstance(x, torch.Tensor):
+            return x.detach().cpu().numpy()
+        return x
+
+    X_train = to_numpy(knn_train_embeddings)
+    y_train = to_numpy(knn_train_labels).ravel()
+    X_test  = to_numpy(test_embeddings)
+    y_test  = to_numpy(test_labels).ravel()
+
+    neigh = KNeighborsClassifier(n_neighbors=n_neighbors)
+    pred_labels = neigh.fit(X_train, y_train).predict(X_test)
+
+    # knn_acc = np.sum(pred_labels == test_labels) / pred_labels.size
+    knn_acc = (pred_labels == y_test).mean()
+
+    return knn_acc
+
+
+
+def knn_val_cclis(opt, model, val_loaders, train_loaders):
+
+     # modelをevalモードに変更
+    model.eval()
+
+    all_task_knn_accuracies = []
+    # all_task_losses = [] # KNN評価では直接的な損失は計算しないので削除またはコメントアウト
+
+
+    with torch.no_grad():
+
+        task_id = 0
+
+        # 各タスクの訓練用データローダーと検証用データローダーを取り出す
+        for val_loader, train_loader in zip(val_loaders, train_loaders):
+
+            # 1. 特徴量バンクの構築
+            # 訓練用（feat_loader）データから全サンプルの特徴とラベルを集めるリスト
+            all_train_features = []
+            all_train_labels = []
+            all_val_features = []
+            all_val_labels = []
+            
+            # 訓練用データローダーから特徴量とラベルを取得
+            for idx, (images, labels) in enumerate(train_loader):
+                images = images.float().cuda()
+                labels = labels.cuda()
+                bsz = labels.shape[0]
+
+                # 特徴量を取得
+                features = model.encoder(images)
+
+                # 特徴量とラベルを保存
+                all_train_features.append(features.cpu())
+                all_train_labels.append(labels.cpu())
+            
+            # 検証用データローダーから特徴量とラベルを取得
+            for idx, (images, labels) in enumerate(val_loader):
+                images = images.float().cuda()
+                labels = labels.cuda()
+                bsz = labels.shape[0]
+                
+                # 特徴量を取得
+                features = model.encoder(images)
+
+                # 特徴量とラベルを保存
+                all_val_features.append(features.cpu())
+                all_val_labels.append(labels.cpu())
+            
+            # リスト内のテンソルを連結
+            all_train_features = torch.cat(all_train_features, dim=0)  # shape: [N, feature_dim]
+            all_train_labels = torch.cat(all_train_labels, dim=0)
+            all_val_features = torch.cat(all_val_features, dim=0)
+            all_val_labels = torch.cat(all_val_labels, dim=0)
+
+            # knn分類
+            knn_acc = knn_eval(all_val_features, all_val_labels, all_train_features, all_train_labels, opt)
+            all_task_knn_accuracies.append(knn_acc)
+
+            task_id += 1
+    
+    return all_task_knn_accuracies
+                
+
+                
+# def validate(val_loader, train_loader, model, args):
+    
+#     model.eval()
+    
+#     test_labels, train_labels = [], []
+#     test_embeddings, train_embeddings = None, None
+    
+    
+#     # k-NN分類の訓練
+#     for idx, out in enumerate(train_loader):
+        
+#         # 画像とラベルの用意
+#         images, target = out['input'], out['target']
+        
+        
+#         # GPUに配置
+#         if torch.cuda.is_available():
+#             images = images.cuda(non_blocking=True)
+        
+        
+#         # 特徴埋め込みの獲得
+#         z, embeddings, feature2 = model(images)
+#         embeddings = embeddings.detach().cpu().numpy()
+        
+        
+#         if train_embeddings is None:
+#             train_embeddings = embeddings
+#         else:
+#             train_embeddings = np.concatenate((train_embeddings, embeddings), axis=0)
+#         train_labels += target.detach().tolist()
+        
+#     train_labels = np.array(train_labels).astype(int)
+    
+#     # 形状の確認
+#     print("train_embeddings.shape : ", train_embeddings.shape)
+#     print("train_labels.shape : ", train_labels.shape)
+    
+    
+#     # k-NN分類を使用してテスト
+#     for idx, out in enumerate(val_loader):
+        
+#         # 画像とラベルを用意
+#         images, target = out['input'], out['target']
+        
+        
+#         # GPUに転送
+#         if torch.cuda.is_available():
+#             images = images.cuda(non_blocking=True)
+        
+        
+#         # 特徴埋め込みの獲得
+#         z, embeddings, feature2 = model(images)
+#         embeddings = embeddings.detach().cpu().numpy()
+        
+#         if test_embeddings is None:
+#             test_embeddings = embeddings
+#         else:
+#             test_embeddings = np.concatenate((test_embeddings, embeddings), axis=0)
+#         test_labels += target.detach().tolist()
+    
+#     test_labels = np.array(test_labels).astype(int)
+    
+    
+    
+#     # k-NN分類
+#     knn_acc = knn_eval(test_embeddings, test_labels, train_embeddings, train_labels, args)
+    
+    
+#     return knn_acc
+
 
 
 def ncm_cclis(model, ncm_loader, val_loader):

@@ -277,6 +277,14 @@ def set_loader(opt, replay_indices, method_tools):
         taskil_loaders = set_taskil_valloader_er_cifar100(opt=opt, normalize=normalize)
     elif opt.dataset == "tiny-imagenet":
         taskil_loaders = set_taskil_valloader_er_tinyimagenet(opt=opt, normalize=normalize)
+    
+    # タスク増加におけるknn分類を行うための訓練用データローダー
+    if opt.dataset == "cifar10":
+        knn_loaders = set_taskil_valloader_er_cifar10(opt=opt, normalize=normalize, train=True)
+    elif opt.dataset == "cifar100":
+        knn_loaders = set_taskil_valloader_er_cifar100(opt=opt, normalize=normalize, train=True)
+    elif opt.dataset == "tiny-imagenet":
+        knn_loaders = set_taskil_valloader_er_tinyimagenet(opt=opt, normalize=normalize, train=True)
 
     
     # 特定の1クラスのみを含むデータローダーをリストに格納して返す（er） or 全てのデータを含むデータローダーを返す（co2l, cclis）
@@ -465,7 +473,7 @@ def set_loader(opt, replay_indices, method_tools):
 
     dataloader = {"train": train_loader, "linear": linear_loader, "val": val_loader, "vanilla": vanilla_loader, "ncm": ncm_loader, "taskil": taskil_loaders,
                   "grad_train": grad_train_loaders, "grad_val": grad_val_loaders, "gradtask_train": grad_train_loaders, "gradtask_val": grad_val_loaders,
-                  "gradreplay_train": gradreplay_train_loader, "gradreplay_val": gradreplay_val_loader}
+                  "gradreplay_train": gradreplay_train_loader, "gradreplay_val": gradreplay_val_loader, "knn_train": knn_loaders}
 
 
     
