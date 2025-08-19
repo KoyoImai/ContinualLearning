@@ -62,14 +62,14 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
 
     elif opt.method == "co2l":
         
-        # loss, model2 = train_co2l(opt=opt, model=model, model2=model2,
-        #                           criterion=criterion, optimizer=optimizer,
-        #                           scheduler=scheduler, train_loader=train_loader,
-        #                           grad_train_loaders=grad_train_loaders, grad_val_loaders=grad_val_loaders,
-        #                           gradtask_train_loaders=gradtask_train_loaders, gradtask_val_loaders=gradtask_val_loaders,
-        #                           gradreplay_train_loader=gradreplay_train_loader, gradreplay_val_loader=gradreplay_val_loader, epoch=epoch)
+        loss, model2 = train_co2l(opt=opt, model=model, model2=model2,
+                                  criterion=criterion, optimizer=optimizer,
+                                  scheduler=scheduler, train_loader=train_loader,
+                                  grad_train_loaders=grad_train_loaders, grad_val_loaders=grad_val_loaders,
+                                  gradtask_train_loaders=gradtask_train_loaders, gradtask_val_loaders=gradtask_val_loaders,
+                                  gradreplay_train_loader=gradreplay_train_loader, gradreplay_val_loader=gradreplay_val_loader, epoch=epoch)
         if epoch % 1 == 0:
-            classil_acc, taskil_acc, all_task_accuracies, all_task_losses = val_co2l(opt, model, model2, linear_loader, val_loader, taskil_loaders, knn_train_loaders, epoch)
+            classil_acc, taskil_acc, all_task_accuracies, all_task_knn_accuracies, all_task_losses = val_co2l(opt, model, model2, linear_loader, val_loader, taskil_loaders, knn_train_loaders, epoch)
             # 各タスクの精度を「task0 acc=100.00, task1 acc=90.00」の形式で整形
             taskil_acc_str = ', '.join([f"task{i} acc={acc:.2f}" for i, acc in enumerate(all_task_accuracies)])
             taskil_knnacc_str = ', '.join([f"task{i} knnacc={acc:.2f}" for i, acc in enumerate(all_task_knn_accuracies)])
