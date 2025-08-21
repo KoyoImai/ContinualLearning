@@ -1513,7 +1513,7 @@ def knn_eval(test_embeddings, test_labels, knn_train_embeddings, knn_train_label
     if args.dataset == 'cifar100':
         n_neighbors = 101
     elif args.dataset == 'cifar10':
-        n_neighbors = 101
+        n_neighbors = 501
     else:
         assert False
     

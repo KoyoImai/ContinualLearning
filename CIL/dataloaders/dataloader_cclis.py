@@ -112,6 +112,8 @@ class BatchSchedulerSampler(torch.utils.data.sampler.Sampler):
 def set_loader_cclis_cifar10(opt, normalize, replay_indices, method_tools, training=True):
 
     importance_weight = method_tools['importance_weight']
+    # print("importance_weight: ", importance_weight)
+    # assert False
 
     train_transform = transforms.Compose([
         transforms.Resize(size=(opt.size, opt.size)),
