@@ -1012,7 +1012,7 @@ def val_co2l(opt, model, model2, linear_loader, val_loader, taskil_loaders, knn_
 
     classil_acc = np.sum(corr)/np.sum(cnt)*100.
     taskil_acc = correct_task/np.sum(cnt)*100.
-    return classil_acc, taskil_acc, all_task_accuracies, all_task_knn_accuracies, all_task_losses
+    return classil_acc, taskil_acc, all_task_accuracies, all_task_knn_accuracies, all_task_losses, classifier
 
 
 def taskil_val_co2l(opt, model, classifier,  criterion, val_loaders):

@@ -42,6 +42,19 @@ def save_model(model, optimizer, opt, epoch, save_file):
     del state
 
 
+# classifierの保存
+def save_classifier(model, opt, epoch, save_file):
+    print('==> Saving...'+save_file)
+    state = {
+        'opt': opt,
+        'model': model.state_dict(),
+        'epoch': epoch,
+    }
+    torch.save(state, save_file)
+    del state
+
+
+
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""

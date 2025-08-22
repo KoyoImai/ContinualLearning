@@ -10,8 +10,8 @@ python main_losslandscape.py \
        --method cclis \
        --cls_list 0 1 2 3 \
        --model_file ${original_path}/model/model_01.pth \
-       --x=-0.1:0.1:9 --y=-0.1:0.1:9 \
-       --surf_file ./losslandscape.h5 \
+       --x=-1:1:51 --y=-1:1:51 \
+       --surf_file ./losslandscape_cclis.h5 \
        --plot \
        --dir_type weights
 

@@ -417,9 +417,9 @@ def main():
     if opt.plot:
         if opt.y and opt.proj_file:
             plot_2D.plot_contour_trajectory(surf_file, dir_file, opt.proj_file, 'train_loss', opt.show)
-        elif args.y:
+        elif opt.y:
             plot_2D.plot_2d_contour(surf_file, 'train_loss', opt.vmin, opt.vmax, opt.vlevel, opt.show)
-        else:
+        else: 
             plot_1D.plot_1d_loss_err(surf_file, opt.xmin, opt.xmax, opt.loss_max, opt.log, opt.show)
 
 

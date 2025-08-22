@@ -1326,6 +1326,38 @@ def val_cclis(opt, model, model2, linear_loader, val_loader, taskil_loaders, knn
     if torch.cuda.is_available():
         classifier = classifier.cuda()
     
+    # # classifierの読み込み
+    # ckpt_path = "/home/kouyou/ContinualLearning/survey/CIL/logs/cclis/debug_cclis_ring500_cifar10_seed0_date2025_0822/model/task00/classifier_epoch001.pth"
+    # ckpt = torch.load(ckpt_path, map_location='cpu')
+    # state_dict = ckpt['model']
+    # # model.load_state_dict(state_dict)
+
+    # # if isinstance(model.encoder, torch.nn.DataParallel):
+    # #     # ② キーごとに変換。たとえば "encoder.conv1.weight" → "encoder.module.conv1.weight"
+    # #     new_dict = {}
+    # #     for k, v in state_dict.items():
+    # #         if k.startswith("encoder."):
+    # #             # "encoder." のあとに来る部分を取り出し、
+    # #             # 先頭に "encoder.module." を付与する
+    # #             suffix = k[len("encoder."):]              # 例: "conv1.weight"
+    # #             new_key = "encoder.module." + suffix       # → "encoder.module.conv1.weight"
+    # #         else:
+    # #             # head.1.weight などは変えずにそのまま載せる
+    # #             new_key = k
+    # #         new_dict[new_key] = v
+
+    # #     model.load_state_dict(new_dict)
+
+    # # else:
+    # #     # model.encoder が DataParallel でなければ，
+    # #     # 保存時と同じキー構造 ("encoder.conv1.weight" ...) のまま読み込む
+    # #     classifier.load_state_dict(state_dict)
+
+    # classifier.load_state_dict(state_dict)
+
+
+
+
     # classifierのOptimizer
     optimizer = optim.SGD(classifier.parameters(),
                           lr=opt.linear_lr,
@@ -1437,7 +1469,7 @@ def val_cclis(opt, model, model2, linear_loader, val_loader, taskil_loaders, knn
 
     classil_acc = np.sum(corr)/np.sum(cnt)*100.
     taskil_acc = correct_task/np.sum(cnt)*100.
-    return classil_acc, taskil_acc, all_task_accuracies, all_task_knn_accuracies, all_task_losses
+    return classil_acc, taskil_acc, all_task_accuracies, all_task_knn_accuracies, all_task_losses, classifier
 
 
 def taskil_val_cclis(opt, model, classifier,  criterion, val_loaders):

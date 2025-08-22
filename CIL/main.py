@@ -665,7 +665,9 @@ def main():
 
         # 保存（opt.model_path）
         file_path = f"{opt.model_path}/model_{opt.target_task:02d}.pth"
+        # save_model(model, method_tools["optimizer"], opt, opt.epochs, file_path)
         save_model(model, method_tools["optimizer"], opt, opt.epochs, file_path)
+    
 
         # print("method_tools['score_mask']: ", method_tools["score_mask"])
         # assert False

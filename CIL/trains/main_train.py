@@ -1,7 +1,12 @@
+import os
+
 import logging
 import copy
 
 import torch.optim.lr_scheduler as lr_scheduler
+
+
+from util import save_model, save_classifier
 
 # from survey.CIL.dataloaders.dataloader_er import set_taskil_valloader_er_cifar10
 from trains.train_er import train_er, val_er, ncm_er, taskil_val_er
@@ -68,8 +73,9 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
                                   grad_train_loaders=grad_train_loaders, grad_val_loaders=grad_val_loaders,
                                   gradtask_train_loaders=gradtask_train_loaders, gradtask_val_loaders=gradtask_val_loaders,
                                   gradreplay_train_loader=gradreplay_train_loader, gradreplay_val_loader=gradreplay_val_loader, epoch=epoch)
-        if epoch % 1 == 0:
-            classil_acc, taskil_acc, all_task_accuracies, all_task_knn_accuracies, all_task_losses = val_co2l(opt, model, model2, linear_loader, val_loader, taskil_loaders, knn_train_loaders, epoch)
+        
+        if (opt.target_task != 0 and epoch % 1 == 0) or (opt.target_task == 0 and epoch % 50 == 0):
+            classil_acc, taskil_acc, all_task_accuracies, all_task_knn_accuracies, all_task_losses, classifier = val_co2l(opt, model, model2, linear_loader, val_loader, taskil_loaders, knn_train_loaders, epoch)
             # 各タスクの精度を「task0 acc=100.00, task1 acc=90.00」の形式で整形
             taskil_acc_str = ', '.join([f"task{i} acc={acc:.2f}" for i, acc in enumerate(all_task_accuracies)])
             taskil_knnacc_str = ', '.join([f"task{i} knnacc={acc:.5f}" for i, acc in enumerate(all_task_knn_accuracies)])
@@ -79,6 +85,13 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
             logger.info(f"task {opt.target_task} Epoch {epoch}: train_loss={loss:.4f}, \
                         ClassIL_accuracy={classil_acc:.3f}, TaskIL_accuracy={taskil_acc:.3f}, NCM_accuracy={ncm_acc:.3f}, \
                         {taskil_acc_str}, {taskil_knnacc_str}")
+
+            # classifierの保存
+            dir_path = f"{opt.model_path}/task{opt.target_task:02d}"
+            file_path = f"{dir_path}/classifier_epoch{epoch:03d}.pth"
+            if not os.path.exists(dir_path):
+                os.makedirs(dir_path)
+            save_classifier(classifier, opt, opt.epochs, file_path)
     
     elif opt.method == "gpm":
 
@@ -145,8 +158,9 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
                                    grad_train_loaders=grad_train_loaders, grad_val_loaders=grad_val_loaders,
                                    gradtask_train_loaders=gradtask_train_loaders, gradtask_val_loaders=gradtask_val_loaders,
                                    gradreplay_train_loader=gradreplay_train_loader, gradreplay_val_loader=gradreplay_val_loader)
-        if epoch % 1 == 0:
-            classil_acc, taskil_acc, all_task_accuracies, all_task_knn_accuracies, all_task_losses = val_cclis(opt, model, model2, linear_loader, val_loader, taskil_loaders, knn_train_loaders, epoch)
+        
+        if (opt.target_task != 0 and epoch % 1 == 0) or (opt.target_task == 0 and epoch % 50 == 0):
+            classil_acc, taskil_acc, all_task_accuracies, all_task_knn_accuracies, all_task_losses, classifier = val_cclis(opt, model, model2, linear_loader, val_loader, taskil_loaders, knn_train_loaders, epoch)
             # 各タスクの精度を「task0 acc=100.00, task1 acc=90.00」の形式で整形
             taskil_acc_str = ', '.join([f"task{i} acc={acc:.2f}" for i, acc in enumerate(all_task_accuracies)])
             taskil_knnacc_str = ', '.join([f"task{i} knnacc={acc:.5f}" for i, acc in enumerate(all_task_knn_accuracies)])
@@ -156,6 +170,14 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
             logger.info(f"task {opt.target_task} Epoch {epoch}: train_loss={loss:.4f}, \
                         ClassIL_accuracy={classil_acc:.3f}, TaskIL_accuracy={taskil_acc:.3f}, NCM_accuracy={ncm_acc:.3f}, \
                         {taskil_acc_str}, {taskil_knnacc_str}")
+            
+            # classifierの保存
+            dir_path = f"{opt.model_path}/task{opt.target_task:02d}"
+            file_path = f"{dir_path}/classifier_epoch{epoch:03d}.pth"
+            if not os.path.exists(dir_path):
+                os.makedirs(dir_path)
+            save_classifier(classifier, opt, opt.epochs, file_path)
+
     
     elif opt.method in ["supcon-joint", "supcon"]:
 
@@ -283,5 +305,3 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
     else:
         assert False
         
-
-    
