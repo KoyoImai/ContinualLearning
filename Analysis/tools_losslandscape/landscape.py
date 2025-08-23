@@ -77,7 +77,7 @@ def get_weights(model):
 # ---------------------------------------------
 # 方向ベクトルのファイル名を生成
 # ---------------------------------------------
-def name_direction_file(args):
+def name_direction_file(args, use_classifier=False):
 
     if args.dir_file:
         assert os.path.exists(args.dir_file), "%s does not exist!" % args.dir_file
@@ -136,7 +136,12 @@ def name_direction_file(args):
     # index number
     if args.idx > 0: dir_file += '_idx=' + str(args.idx)
 
-    dir_file += ".h5"
+    
+    if use_classifier:
+        dir_file += ".h5"
+    else:
+        dir_file += "_classifier.h5"
+
 
     print("dir_file: ", dir_file)
 

@@ -60,7 +60,46 @@ def evaluation_cclis(model, criterion, dataloader, args):
 
 
 
+def evaluation_classifier_cclis(model, classifier, criterion, dataloader, args):
 
+    # model を evalモードに変更
+    model.eval()
+    classifier.eval()
+
+
+    correct = 0
+    total_loss = 0
+    total = 0 # number of samples
+    num_batch = len(dataloader)
+
+    if torch.cuda.is_available():
+        model.cuda()
+        classifier.cuda()
+    
+    with torch.no_grad():
+
+        for idx, (images, labels) in enumerate(dataloader):
+
+            images = images.cuda(non_blocking=True)
+            labels = labels.cuda(non_blocking=True)
+            bsz = labels.shape[0]
+
+            total += bsz
+
+            features = model.encoder(images)
+            output = classifier(features.detach())
+
+            loss = criterion(output, labels)
+            # print("loss: ", loss)
+
+            total_loss += loss.item()
+
+            _, predicted = torch.max(output.data, 1)
+            correct += predicted.eq(labels).sum().item()
+            # print("correct: ", correct)
+
+
+    return total_loss/total, 100.*correct/total
 
 
 

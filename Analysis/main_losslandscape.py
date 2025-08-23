@@ -13,6 +13,8 @@ import torch
 
 from util import seed_everything
 
+from models.resnet_cifar_co2l import LinearClassifier
+
 import tools_losslandscape.projection as proj
 import tools_losslandscape.scheduler as scheduler
 import tools_losslandscape.evaluation as evaluation
@@ -38,9 +40,13 @@ def parse_option():
     parser.add_argument('--model_file', type=str, default='', help='path to the trained model file')
     parser.add_argument('--model_file2', type=str, default='', help='use (model_file2 - model_file) as the xdirection')
     parser.add_argument('--model_file3', type=str, default='', help='use (model_file3 - model_file) as the ydirection')
+    parser.add_argument('--classifier_file', type=str, default='', help='path to the trained model file')
+    parser.add_argument('--classifier_file2', type=str, default='', help='use (model_file2 - model_file) as the xdirection')
+    parser.add_argument('--classifier_file3', type=str, default='', help='use (model_file3 - model_file) as the ydirection')
     
     # 手法毎のハイパラ（co2l，cclis）
     parser.add_argument("--temp", type=float, default=0.1)
+    parser.add_argument("--use_classifier", action='store_true')
 
     # 手法毎のハイパラ（cclis）
     parser.add_argument('--wo_is', default=False, action='store_true')
@@ -183,7 +189,7 @@ def make_setup(opt):
 # ---------------------------------------------
 # 可視化結果の出力ファイル名を決定
 # ---------------------------------------------
-def name_surface_file(args, dir_file):
+def name_surface_file(args, dir_file, use_classifier=False):
     # skip if surf_file is specified in args
     if args.surf_file:
         return args.surf_file
@@ -202,7 +208,10 @@ def name_surface_file(args, dir_file):
     if args.data_split > 1:
         surf_file += '_datasplit=' + str(args.data_split) + '_splitidx=' + str(args.split_idx)
 
-    return surf_file + ".h5"
+    if not use_classifier:
+        return surf_file + ".h5"
+    elif use_classifier:
+        return surf_file + "_classifier.h5"
 
 
 # ---------------------------------------------
@@ -235,7 +244,6 @@ def setup_surface_file(args, surf_file, dir_file):
 
 
 def crunch(surf_file, net, w, s, d, dataloader, loss_key, acc_key, criterion, args):
-
 
     # ファイルを開く
     f = h5py.File(surf_file, 'r+')
@@ -324,6 +332,107 @@ def crunch(surf_file, net, w, s, d, dataloader, loss_key, acc_key, criterion, ar
 
 
 
+
+def crunch_with_classifier(surf_file, net, classifier, w, w_classifier, s, s_classifier, d, d_classifier, dataloader, loss_key, acc_key, args):
+
+    # 交差エントロピー損失
+    criterion = torch.nn.CrossEntropyLoss()
+
+
+    # ファイルを開く
+    f = h5py.File(surf_file, 'r+')
+    losses, accuracies = [], []
+
+    # 座標と結果配列を用意
+    xcoordinates = f['xcoordinates'][:]
+    ycoordinates = f['ycoordinates'][:] if 'ycoordinates' in f.keys() else None
+    
+    # 結果がなければ -1 で埋める
+    if loss_key not in f.keys():
+        shape = xcoordinates.shape if ycoordinates is None else (len(xcoordinates),len(ycoordinates))
+        losses = -np.ones(shape=shape)
+        accuracies = -np.ones(shape=shape)
+        
+        f[loss_key] = losses
+        f[acc_key] = accuracies
+    
+    # 結果が存在すれば読み込み
+    else:
+        losses = f[loss_key][:]
+        accuracies = f[acc_key][:]
+    
+    # Generate a list of indices of 'losses' that need to be filled in.
+    # The coordinates of each unfilled index (with respect to the direction vectors
+    # stored in 'd') are stored in 'coords'.
+    inds, coords, inds_nums = scheduler.get_job_indices(losses, xcoordinates, ycoordinates)
+
+    print('Computing %d values'% (len(inds)))
+    start_time = time.time()
+    total_sync = 0.0
+
+
+    # 損失を計算
+    for count, ind in enumerate(inds):
+        # Get the coordinates of the loss value being calculated
+        coord = coords[count]
+
+        # Load the weights corresponding to those coordinates into the net
+        if args.dir_type == 'weights':
+
+            # modelとclassifierの重みを変更
+            set_weights(net.module if args.ngpu > 1 else net, w, d, coord)
+            set_weights(classifier.module if args.ngpu > 1 else classifier, w_classifier, d_classifier, coord)
+
+        elif args.dir_type == 'states':
+            set_states(net.module if args.ngpu > 1 else net, s, d, coord)
+            set_states(classifier.module if args.ngpu > 1 else classifier, s_classifier, d_classifier, coord)
+
+        
+        # Record the time to compute the loss value
+        loss_start = time.time()
+
+        if args.method == "cclis":
+            loss, acc = evaluation.evaluation_classifier_cclis(net, classifier, criterion, dataloader, args)
+        elif args.method == "co2l":
+            loss, acc = evaluation.evaluation_classifier_co2l(net, classifier, criterion, dataloader, args)
+
+
+        # 対処損失の場合精度が出ないので代わりに0埋め
+        if acc is None:
+            acc = 0.0
+
+        loss_compute_time = time.time() - loss_start
+
+
+        # Record the result in the local array
+        losses.ravel()[ind] = loss
+        accuracies.ravel()[ind] = acc
+
+
+        # Send updated plot data to the master node
+        syc_start = time.time()
+        syc_time = time.time() - syc_start
+        total_sync += syc_time
+
+        f[loss_key][:] = losses
+        f[acc_key][:] = accuracies
+        f.flush()
+
+        print('Evaluating  %d/%d  (%.1f%%)  coord=%s \t%s= %.3f \t%s=%.2f \ttime=%.2f \tsync=%.2f' % (
+                count, len(inds), 100.0 * count/len(inds), str(coord), loss_key, loss,
+                acc_key, acc, loss_compute_time, syc_time))
+
+
+    total_time = time.time() - start_time
+    print('Done!! Total time: %.2f Sync: %.2f' % (total_time, total_sync))
+
+    f.close()
+
+
+
+
+
+
 def main():
 
     # コマンドライン引数の処理
@@ -345,12 +454,17 @@ def main():
 
 
     # -----------------------------
-    # modelと損失関数の用意
+    # model classifier 損失関数の用意
     # モデルはresnet18，損失関数は交差エントロピー・対照損失（・蒸留損失など）が主な対象
     # -----------------------------
     model, criterion = make_setup(opt=opt)
     model2, _ = make_setup(opt=opt)           # --model_file2 が存在する場合，その重みパラメータを読み込むようのモデル
     model3, _ = make_setup(opt=opt)           # --model_file3 が存在する場合，その重みパラメータを読み込むようのモデル
+
+    if opt.method in ["co2l", "cclis"] and opt.use_classifier:
+        classifier = LinearClassifier(name="resnet18", num_classes=10, seed=opt.seed)
+        classifier2 = LinearClassifier(name="resnet18", num_classes=10, seed=opt.seed)
+        classifier3 = LinearClassifier(name="resnet18", num_classes=10, seed=opt.seed)
 
 
     # -----------------------------
@@ -368,26 +482,48 @@ def main():
     w = get_weights(model)                    # 初期パラメータ（Tensorのリスト）
     s = copy.deepcopy(model.state_dict())     # state_dict も保持（DeepCopy）
 
+    if opt.method in ["co2l", "cclis"] and opt.use_classifier:
+
+        ckpt = torch.load(opt.classifier_file, map_location='cpu')
+        state_dict = ckpt['model']
+        classifier.load_state_dict(state_dict)
+
+        w_classifier = get_weights(classifier)                    # 初期パラメータ（Tensorのリスト）
+        s_classifier = copy.deepcopy(classifier.state_dict())     # state_dict も保持（DeepCopy）
 
     # -----------------------------
     # 方向ベクトルの準備，ファイル保存
     # -----------------------------
     dir_file = name_direction_file(opt)                       # 方向ファイル名の決定
+    dir_file_classifier = name_direction_file(opt, use_classifier=opt.use_classifier)
+
     setup_direction(opt, dir_file, model, model2, model3)     # 方向ファイルの生成
+    if opt.use_classifier:
+        setup_direction(opt, dir_file_classifier, classifier, classifier2, classifier3)     # 方向ファイルの生成 for classifier
+
 
     surf_file = name_surface_file(opt, dir_file)
     setup_surface_file(opt, surf_file, dir_file)
+
+    # if opt.use_classifier:
+    #     surf_file_classifier = name_surface_file(opt, dir_file, True)
+
 
 
     # -----------------------------
     # 方向ベクトルの読み込み
     # -----------------------------
     d = load_directions(dir_file)
+    d_classifier = load_directions(dir_file_classifier)
+
     # calculate the consine similarity of the two directions
     if len(d) == 2:
         similarity = proj.cal_angle(proj.nplist_to_tensor(d[0]), proj.nplist_to_tensor(d[1]))
         print('cosine similarity between x-axis and y-axis: %f' % similarity)
 
+    if len(d_classifier) == 2:
+        similarity = proj.cal_angle(proj.nplist_to_tensor(d_classifier[0]), proj.nplist_to_tensor(d_classifier[1]))
+        print('cosine similarity between x-axis and y-axis: %f' % similarity)
     
 
     # -----------------------------
@@ -401,6 +537,9 @@ def main():
         model = model.cuda().eval()
         criterion = criterion.cuda()
 
+        if opt.use_classifier:
+            classifier = classifier.cuda().eval()
+
     # データローダーを取り出し
     trainloader, val_loader = dataloaders
 
@@ -408,9 +547,12 @@ def main():
     #--------------------------------------------------------------------------
     # Start the computation
     #--------------------------------------------------------------------------
-    crunch(surf_file, model, w, s, d, trainloader, 'train_loss', 'train_acc', criterion, opt)
+    if not opt.use_classifier:
+        crunch(surf_file, model, w, s, d, trainloader, 'train_loss', 'train_acc', criterion, opt)
+    elif opt.use_classifier:
+        crunch_with_classifier(surf_file, model, classifier, w, w_classifier, s, s_classifier, d, d_classifier, trainloader, 'train_loss', 'train_acc', opt)
 
-
+    
     #--------------------------------------------------------------------------
     # 可視化を実行
     #--------------------------------------------------------------------------

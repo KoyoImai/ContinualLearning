@@ -71,5 +71,6 @@ def plot_2d_contour(surf_file, surf_name='train_loss', vmin=0.1, vmax=10, vlevel
     fig.savefig(surf_file + '_' + surf_name + '_3dsurface.pdf', dpi=300,
                 bbox_inches='tight', format='pdf')
 
+    assert False
     f.close()
     if show: plt.show()

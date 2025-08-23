@@ -6,6 +6,7 @@ from torchvision import transforms, datasets
 
 from tools_losslandscape.cclis_dataloader import cclis_dataloader_cifar10
 from tools_losslandscape.co2l_dataloader import co2l_dataloader_cifar10
+from tools_losslandscape.er_dataloader import er_dataloader_cifar10
 
 
 def make_dataloader(opt):
@@ -27,7 +28,9 @@ def make_dataloader(opt):
 
     normalize = transforms.Normalize(mean=mean, std=std)
 
-    if opt.method == "cclis":
+    
+    
+    if opt.method == "cclis" and (not opt.use_classifier):
 
         if opt.dataset == "cifar10":
 
@@ -37,7 +40,7 @@ def make_dataloader(opt):
         else:
             assert False
     
-    elif opt.method == "co2l":
+    elif opt.method == "co2l" and (not opt.use_classifier):
 
         if opt.dataset == "cifar10":
 
@@ -47,6 +50,11 @@ def make_dataloader(opt):
         else:
             assert False
 
+    elif opt.method == "er" or opt.use_classifier:
+
+        if opt.dataset == "cifar10":
+            train_loader = er_dataloader_cifar10(opt=opt, normalize=normalize, train=True)
+            val_loader = er_dataloader_cifar10(opt=opt, normalize=normalize, train=False)
 
 
     return train_loader, val_loader
