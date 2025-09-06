@@ -35,7 +35,7 @@ def parse_option():
     parser.add_argument('--data_folder', type=str, default='/home/kouyou/Datasets/', help='path to custom dataset')
     parser.add_argument('--data_order', type=str, default="original")
     parser.add_argument('--dataset', type=str, default="cifar100", choices=["cifar10", "cifar100", "tiny-imagenet", "imagenet"])
-    parser.add_argument("--unlabeled_dataset", type=str, default="imagenet32", choices=["imagenet32"])
+
 
     # 最適化設定
     parser.add_argument('--epochs', type=int, default=100)
@@ -44,7 +44,7 @@ def parse_option():
     parser.add_argument('--learning_rate', type=float, default=0.03)
     parser.add_argument('--momentum', type=float, default=0.9)
     parser.add_argument('--weight_decay', type=float, default=1e-4)
-    parser.add_argument('--uloss_weight', type=float, default=1.0)
+
 
     parser.add_argument('--linear_batch_size', type=int, default=128)
     parser.add_argument('--linear_learning_rate', type=float, default=1.0)
@@ -168,7 +168,7 @@ def make_setup(opt):
         model = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed)
         model2 = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed)
         criterion = SupConLoss(temperature=opt.temp_co2l, not_asym=opt.not_asym)
-        criterion_u = ContrastiveLoss()
+
         optimizer = optim.SGD(model.parameters(),
                                 lr=opt.learning_rate,
                                 momentum=opt.momentum,
@@ -190,7 +190,7 @@ def make_setup(opt):
         model = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed, opt=opt)
         model2 = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed, opt=opt)
         criterion = ISSupConLoss(temperature=opt.temp_cclis, opt=opt)
-        criterion_u = ContrastiveLoss()
+
 
         if 'prototypes.weight' in model.state_dict().keys():
             optimizer = optim.SGD([
@@ -218,7 +218,6 @@ def make_setup(opt):
         model = model.cuda()
         model2 = model2.cuda()
         criterion = criterion.cuda()
-        criterion_u = criterion_u.cuda()
 
         model = torch.nn.DataParallel(model)
         model2 = torch.nn.DataParallel(model2)
@@ -228,7 +227,7 @@ def make_setup(opt):
 
     
 
-    return model, model2, criterion, criterion_u, method_tools
+    return model, model2, criterion, method_tools
     
 
 
@@ -278,7 +277,7 @@ def main():
     logging.info("Experiment started")
 
     # modelの作成，損失関数の作成，Optimizerの作成
-    model, model2, criterion, criterion_u, method_tools = make_setup(opt)
+    model, model2, criterion, method_tools = make_setup(opt)
     # print("model: ", model)
     # assert False
 
@@ -341,7 +340,7 @@ def main():
         for epoch in range(1, opt.epochs+1):
 
             # 学習 & 検証
-            train(opt=opt, model=model, model2=model2, criterion=criterion, criterion_u=criterion_u,
+            train(opt=opt, model=model, model2=model2, criterion=criterion,
                   optimizer=method_tools["optimizer"], scheduler=scheduler, dataloader=dataloader,
                   epoch=epoch, method_tools=method_tools)
         

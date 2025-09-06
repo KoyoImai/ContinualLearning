@@ -11,11 +11,10 @@ logger = logging.getLogger(__name__)
 
 
 
-def train(opt, model, model2, criterion, criterion_u, optimizer, scheduler, dataloader, epoch, method_tools):
+def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch, method_tools):
 
     # データローダーの分解
     train_loader = dataloader["train"]
-    unlabeled_loader = dataloader["unlabeled"]
     val_loader = dataloader["val"]
     linear_loader = dataloader["linear"]
     ncm_loader = dataloader["ncm"]
@@ -29,8 +28,8 @@ def train(opt, model, model2, criterion, criterion_u, optimizer, scheduler, data
     
     elif opt.method == "co2l":
 
-        loss, model2 = train_co2l(opt=opt, model=model, model2=model2, criterion=criterion, criterion_u=criterion_u, optimizer=optimizer,
-                                  scheduler=scheduler, train_loader=train_loader, unlabeled_loader=unlabeled_loader, epoch=epoch)
+        loss, model2 = train_co2l(opt=opt, model=model, model2=model2, criterion=criterion, optimizer=optimizer,
+                                  scheduler=scheduler, train_loader=train_loader, epoch=epoch)
     
         if epoch % opt.val_freq == 0:
             classil_acc, taskil_acc, all_task_accuracies, all_task_knn_accuracies, all_task_losses, classifier = val_co2l(opt, model, model2, linear_loader, val_loader, taskil_loaders, knn_train_loaders, epoch)
@@ -59,8 +58,8 @@ def train(opt, model, model2, criterion, criterion_u, optimizer, scheduler, data
         subset_sample_num = model.module.subset_sample_num
         score_mask = model.module.score_mask
 
-        loss, model2 = train_cclis(opt=opt, model=model, model2=model2, criterion=criterion, criterion_u=criterion_u, optimizer=optimizer,
-                                   train_loader=train_loader, unlabeled_loader=unlabeled_loader, epoch=epoch, subset_sample_num=subset_sample_num, score_mask=score_mask)
+        loss, model2 = train_cclis(opt=opt, model=model, model2=model2, criterion=criterion, optimizer=optimizer,
+                                   train_loader=train_loader, epoch=epoch, subset_sample_num=subset_sample_num, score_mask=score_mask)
 
         if epoch % opt.val_freq == 0:
             classil_acc, taskil_acc, all_task_accuracies, all_task_knn_accuracies, all_task_losses, classifier = val_cclis(opt, model, model2, linear_loader, val_loader, taskil_loaders, knn_train_loaders, epoch)

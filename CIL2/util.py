@@ -84,7 +84,7 @@ class AverageMeter(object):
 
 
 # csvファイルに値を書き込む
-def write_csv(value, path, file_name, epoch):
+def write_csv(value, path, file_name, task, epoch):
     # ファイルパスを生成
     file_path = f"{path}/{file_name}.csv"
 
@@ -95,18 +95,18 @@ def write_csv(value, path, file_name, epoch):
             writer = csv.writer(csvfile)
             # ヘッダー行を定義（必要に応じて適宜変更）
             if isinstance(value, list):
-                header = ["epoch"] + [f"value_{i+1}" for i in range(len(value))]
+                header = ["task"] + ["epoch"] + [f"value_{i+1}" for i in range(len(value))]
             else:
-                header = ["epoch", "value"]
+                header = ["task", "epoch", "value"]
             writer.writerow(header)
 
     # CSV に実際のデータを追加記録する
     with open(file_path, 'a', newline='') as csvfile:
         writer = csv.writer(csvfile)
         if isinstance(value, list):
-            row = [epoch] + value
+            row = [task] + [epoch] + value
         else:
-            row = [epoch, value]
+            row = [task, epoch, value]
         writer.writerow(row)
 
 

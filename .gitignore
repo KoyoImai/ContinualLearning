@@ -1,6 +1,7 @@
 CIL/logs/
 Analysis/logs/
 OpenCIL/logs/
+CIL2/logs/
 
 __pycache__/
 *.pyc

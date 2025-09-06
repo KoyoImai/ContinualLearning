@@ -9,7 +9,7 @@ from dataloaders.dataloader_er import set_ncmloader_er_cifar10, set_ncmloader_er
 from dataloaders.dataloader_er import set_taskil_valloader_er_cifar10, set_taskil_valloader_er_cifar100, set_taskil_valloader_er_tinyimagenet
 
 # co2l
-from dataloaders.dataloader_co2l import set_loader_co2l_imagenet32
+# from dataloaders.dataloader_co2l import set_loader_co2l_imagenet32    #ラベルなしデータセット
 from dataloaders.dataloader_co2l import set_loader_co2l_cifar10, set_linearloader_co2l_cifar10, set_valloader_co2l_cifar10
 from dataloaders.dataloader_co2l import set_loader_co2l_cifar100, set_linearloader_co2l_cifar100, set_valloader_co2l_cifar100
 from dataloaders.dataloader_co2l import set_loader_co2l_tinyimagenet, set_linearloader_co2l_tinyimagenet, set_valloader_co2l_tinyimagenet
@@ -56,10 +56,9 @@ def set_loader(opt, model, replay_indices, method_tools):
     
     elif opt.method in ["co2l"]:
 
-        if opt.unlabeled_dataset == "imagenet32":
-
-            unlabeled_loader = set_loader_co2l_imagenet32(opt=opt, root=opt.data_folder, normalize=normalize)
-            # print("len(unlabeled_loader): ", len(unlabeled_loader))            
+        # if opt.unlabeled_dataset == "imagenet32":
+        #     unlabeled_loader = set_loader_co2l_imagenet32(opt=opt, root=opt.data_folder, normalize=normalize)
+        #     print("len(unlabeled_loader): ", len(unlabeled_loader))            
 
         if opt.dataset == "cifar10":
             train_loader, subset_indices = set_loader_co2l_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices)
@@ -77,9 +76,8 @@ def set_loader(opt, model, replay_indices, method_tools):
 
     elif opt.method in ["cclis"]:
 
-        if opt.unlabeled_dataset == "imagenet32":
-
-            unlabeled_loader = set_loader_co2l_imagenet32(opt=opt, root=opt.data_folder, normalize=normalize)
+        # if opt.unlabeled_dataset == "imagenet32":
+        #     unlabeled_loader = set_loader_co2l_imagenet32(opt=opt, root=opt.data_folder, normalize=normalize)
 
         if opt.dataset == 'cifar10':
 
@@ -137,7 +135,7 @@ def set_loader(opt, model, replay_indices, method_tools):
 
 
 
-    dataloaders = {"train": train_loader, "unlabeled": unlabeled_loader, "val": val_loader, "linear": linear_loader, "ncm": ncm_loader, "taskil": taskil_loaders, "knn": knn_loaders}
+    dataloaders = {"train": train_loader, "val": val_loader, "linear": linear_loader, "ncm": ncm_loader, "taskil": taskil_loaders, "knn": knn_loaders}
 
     return dataloaders, subset_indices
 
