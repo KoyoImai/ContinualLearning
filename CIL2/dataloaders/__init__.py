@@ -82,7 +82,7 @@ def set_loader(opt, model, replay_indices, method_tools):
         if opt.dataset == 'cifar10':
 
             train_loader, subset_indices, subset_sample_num = set_loader_cclis_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices, model=model)
-            post_loader, _, _ = set_loader_cclis_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices, method_tools=method_tools, training=False)
+            post_loader, _, _ = set_loader_cclis_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices, model=model, training=False)
             val_loader = set_valloader_co2l_cifar10(opt=opt, normalize=normalize)
             linear_loader = set_linearloader_co2l_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices)
 
