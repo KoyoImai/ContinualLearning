@@ -242,7 +242,7 @@ class ISSupConLoss(nn.Module):
         if reduction == "mean":
             IS_supcon_loss = - (log_prob * mask).sum() / mask.sum()
         elif reduction == "grad_analysis":
-            IS_supcon_loss = - (log_prob * mask).sum(0) / mask.sum(0)
+            IS_supcon_loss = - (log_prob * mask).sum(0) / mask.sum()
             # print("IS_supcon_loss.shape: ", IS_supcon_loss.shape)  # IS_supcon_loss.shape:  torch.Size([512])
 
         return IS_supcon_loss

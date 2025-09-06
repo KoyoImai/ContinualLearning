@@ -16,6 +16,7 @@ from trains.train_lucir import train_lucir, val_lucir, ncm_lucir
 from trains.train_fsdgpm import train_fsdgpm, val_fsdgpm
 from trains.train_cclis import train_cclis, val_cclis, ncm_cclis, adjust_learning_rate_cclis
 from trains.train_cclis_wo import train_cclis_wo, val_cclis_wo, ncm_cclis_wo
+from trains.train_cclis_pcgrad import train_cclis_pcgrad, adjust_learning_rate_cclis_pcgrad
 from trains.train_supcon import train_supcon
 from trains.train_cclis_bw import train_cclis_bw
 from trains.train_cclis_rfr import train_cclis_rfr
@@ -177,6 +178,40 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
             if not os.path.exists(dir_path):
                 os.makedirs(dir_path)
             save_classifier(classifier, opt, opt.epochs, file_path)
+    
+    elif opt.method in ["cclis-pcgrad"]:
+
+        adjust_learning_rate_cclis_pcgrad(opt, optimizer, epoch)
+
+        subset_sample_num = method_tools["subset_sample_num"]
+        score_mask = method_tools["score_mask"]
+
+        loss, model2 = train_cclis_pcgrad(opt=opt, model=model, model2=model2,
+                                          criterion=criterion, optimizer=optimizer,
+                                          subset_sample_num=subset_sample_num, score_mask=score_mask,
+                                          scheduler=scheduler, train_loader=train_loader, epoch=epoch,
+                                          grad_train_loaders=grad_train_loaders, grad_val_loaders=grad_val_loaders,
+                                          gradtask_train_loaders=gradtask_train_loaders, gradtask_val_loaders=gradtask_val_loaders,
+                                          gradreplay_train_loader=gradreplay_train_loader, gradreplay_val_loader=gradreplay_val_loader)
+        
+        if (opt.target_task != 0 and epoch % 1 == 0) or (opt.target_task == 0 and epoch % 50 == 0):
+            classil_acc, taskil_acc, all_task_accuracies, all_task_knn_accuracies, all_task_losses, classifier = val_cclis(opt, model, model2, linear_loader, val_loader, taskil_loaders, knn_train_loaders, epoch)
+            # 各タスクの精度を「task0 acc=100.00, task1 acc=90.00」の形式で整形
+            taskil_acc_str = ', '.join([f"task{i} acc={acc:.2f}" for i, acc in enumerate(all_task_accuracies)])
+            taskil_knnacc_str = ', '.join([f"task{i} knnacc={acc:.5f}" for i, acc in enumerate(all_task_knn_accuracies)])
+
+            ncm_acc = ncm_cclis(model, ncm_loader, val_loader)
+
+            logger.info(f"task {opt.target_task} Epoch {epoch}: train_loss={loss:.4f}, \
+                        ClassIL_accuracy={classil_acc:.3f}, TaskIL_accuracy={taskil_acc:.3f}, NCM_accuracy={ncm_acc:.3f}, \
+                        {taskil_acc_str}, {taskil_knnacc_str}")
+            
+            # classifierの保存
+            dir_path = f"{opt.model_path}/task{opt.target_task:02d}"
+            file_path = f"{dir_path}/classifier_epoch{epoch:03d}.pth"
+            if not os.path.exists(dir_path):
+                os.makedirs(dir_path)
+            save_classifier(classifier, opt, opt.epochs, file_path)
 
     
     elif opt.method in ["supcon-joint", "supcon"]:
@@ -185,16 +220,35 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
                                     criterion=criterion, optimizer=optimizer,
                                     scheduler=scheduler, train_loader=train_loader, epoch=epoch)
         
-        if epoch % 50 == 0 or epoch == opt.epochs or epoch == opt.start_epoch:
-            classil_acc, taskil_acc, all_task_accuracies, all_task_losses = val_co2l(opt, model, model2, linear_loader, val_loader, taskil_loaders, epoch)
+        # if (opt.target_task != 0 and epoch % 1 == 0) or (opt.target_task == 0 and epoch % 50 == 0):
+        #     classil_acc, taskil_acc, all_task_accuracies, all_task_losses = val_co2l(opt, model, model2, linear_loader, val_loader, taskil_loaders, epoch)
 
+        #     taskil_acc_str = ', '.join([f"task{i} acc={acc:.2f}" for i, acc in enumerate(all_task_accuracies)])
+
+        #     ncm_acc = ncm_co2l(model, ncm_loader, val_loader)
+
+        #     logger.info(f"task {opt.target_task} Epoch {epoch}: train_loss={loss:.4f}, \
+        #                 ClassIL_accuracy={classil_acc:.3f}, TaskIL_accuracy={taskil_acc:.3f}, NCM_accuracy={ncm_acc:.3f}, \
+        #                 {taskil_acc_str}")
+        
+        if (opt.target_task != 0 and epoch % 1 == 0) or (opt.target_task == 0 and epoch % 50 == 0):
+            classil_acc, taskil_acc, all_task_accuracies, all_task_knn_accuracies, all_task_losses, classifier = val_co2l(opt, model, model2, linear_loader, val_loader, taskil_loaders, knn_train_loaders, epoch)
+            # 各タスクの精度を「task0 acc=100.00, task1 acc=90.00」の形式で整形
             taskil_acc_str = ', '.join([f"task{i} acc={acc:.2f}" for i, acc in enumerate(all_task_accuracies)])
+            taskil_knnacc_str = ', '.join([f"task{i} knnacc={acc:.5f}" for i, acc in enumerate(all_task_knn_accuracies)])
 
             ncm_acc = ncm_co2l(model, ncm_loader, val_loader)
 
             logger.info(f"task {opt.target_task} Epoch {epoch}: train_loss={loss:.4f}, \
                         ClassIL_accuracy={classil_acc:.3f}, TaskIL_accuracy={taskil_acc:.3f}, NCM_accuracy={ncm_acc:.3f}, \
-                        {taskil_acc_str}")
+                        {taskil_acc_str}, {taskil_knnacc_str}")
+
+            # classifierの保存
+            dir_path = f"{opt.model_path}/task{opt.target_task:02d}"
+            file_path = f"{dir_path}/classifier_epoch{epoch:03d}.pth"
+            if not os.path.exists(dir_path):
+                os.makedirs(dir_path)
+            save_classifier(classifier, opt, opt.epochs, file_path)
     
     elif opt.method in ["cclis-wo", "cclis-wo-ss", "cclis-wo-is"]:
 

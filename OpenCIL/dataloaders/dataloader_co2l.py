@@ -1,0 +1,509 @@
+import numpy as np
+
+import torch
+from torchvision import transforms, datasets
+from torch.utils.data import Subset
+from torch.utils.data import WeightedRandomSampler
+
+from dataloaders.imagenet32 import ImageNet32
+from dataloaders.tiny_imagenets import TinyImagenet
+
+
+
+class TwoCropTransform:
+    """Create two crops of the same image"""
+    def __init__(self, transform):
+        self.transform = transform
+
+    def __call__(self, x):
+        return [self.transform(x), self.transform(x)]
+
+
+
+
+
+# ==============================================================
+# ラベルなしImagenet32
+# ==============================================================
+def set_loader_co2l_imagenet32(opt, root, normalize):
+
+    train_transform = transforms.Compose([
+        transforms.Resize(size=(opt.size, opt.size)),
+        transforms.RandomResizedCrop(size=opt.size, scale=(0.1, 1.)),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomApply([
+            transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
+        ], p=0.8),
+        transforms.RandomGrayscale(p=0.2),
+        transforms.RandomApply([transforms.GaussianBlur(kernel_size=opt.size//20*2+1, sigma=(0.1, 2.0))], p=0.5 if opt.size>32 else 0.0),
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    unlabeled_dataset = ImageNet32(opt=opt, transform=TwoCropTransform(train_transform), root=root)
+
+    unlabeled_loader = torch.utils.data.DataLoader(
+        unlabeled_dataset, batch_size=opt.batch_size, shuffle=True,
+        num_workers=opt.num_workers, pin_memory=True, drop_last=True)
+
+
+    # for data in unlabeled_loader:
+
+    #     imgs, labels = data
+    #     print("imgs[0].shape: ", imgs[0].shape)
+    #     print("imgs[1].shape: ", imgs[1].shape)
+    #     print("labels.shape: ", labels.shape)
+
+    # assert False        
+
+    return unlabeled_loader
+
+
+
+
+# ==============================================================
+# 訓練用cifar10
+# ==============================================================
+def set_loader_co2l_cifar10(opt, normalize, replay_indices):
+
+    train_transform = transforms.Compose([
+        transforms.Resize(size=(opt.size, opt.size)),
+        transforms.RandomResizedCrop(size=opt.size, scale=(0.1, 1.)),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomApply([
+            transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
+        ], p=0.8),
+        transforms.RandomGrayscale(p=0.2),
+        transforms.RandomApply([transforms.GaussianBlur(kernel_size=opt.size//20*2+1, sigma=(0.1, 2.0))], p=0.5 if opt.size>32 else 0.0),
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    # 現在タスクのクラス
+    target_classes = list(range(opt.target_task*opt.cls_per_task, (opt.target_task+1)*opt.cls_per_task))
+    print(target_classes)
+
+    subset_indices = []
+    _train_dataset = datasets.CIFAR10(root=opt.data_folder,
+                                      transform=TwoCropTransform(train_transform),
+                                      download=True)
+    
+    for tc in target_classes:
+        target_class_indices = np.where(np.array(_train_dataset.targets) == tc)[0]
+        subset_indices += np.where(np.array(_train_dataset.targets) == tc)[0].tolist()
+
+    subset_indices += replay_indices
+
+    train_dataset =  Subset(_train_dataset, subset_indices)
+    print('Dataset size: {}'.format(len(subset_indices)))
+    uk, uc = np.unique(np.array(_train_dataset.targets)[subset_indices], return_counts=True)
+    print(uc[np.argsort(uk)])
+
+    train_sampler = None
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset, batch_size=opt.batch_size, shuffle=(train_sampler is None),
+        num_workers=opt.num_workers, pin_memory=True, sampler=train_sampler, drop_last=True)
+
+    return train_loader, subset_indices
+
+
+# 線形層訓練用cifar10
+def set_linearloader_co2l_cifar10(opt, normalize, replay_indices):
+
+    train_transform = transforms.Compose([
+        transforms.Resize(size=(opt.size, opt.size)),
+        transforms.RandomResizedCrop(size=opt.size, scale=(0.1, 1.)),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomApply([
+            transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
+        ], p=0.8),
+        transforms.RandomGrayscale(p=0.2),
+        transforms.RandomApply([transforms.GaussianBlur(kernel_size=opt.size//20*2+1, sigma=(0.1, 2.0))], p=0.5 if opt.size>32 else 0.0),
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    target_classes = list(range(0, (opt.target_task+1)*opt.cls_per_task))
+
+    subset_indices = []
+    _train_dataset = datasets.CIFAR10(root=opt.data_folder,
+                                        transform=train_transform,
+                                        download=True)
+
+    _train_targets = np.array(_train_dataset.targets)
+    for tc in range(opt.target_task*opt.cls_per_task, (opt.target_task+1)*opt.cls_per_task):
+        subset_indices += np.where(np.array(_train_dataset.targets) == tc)[0].tolist()
+
+
+    if isinstance(replay_indices, list):
+        subset_indices += replay_indices
+    elif isinstance(replay_indices, np.ndarray):
+        subset_indices += replay_indices.tolist()
+    else:
+        assert False
+
+
+    ut, uc = np.unique(_train_targets[subset_indices], return_counts=True)
+    print(ut)
+    print(uc)
+
+    weights = np.array([0.] * len(subset_indices))
+    for t, c in zip(ut, uc):
+        weights[_train_targets[subset_indices] == t] = 1./c
+
+    train_dataset =  Subset(_train_dataset, subset_indices)
+
+    train_sampler = WeightedRandomSampler(torch.Tensor(weights), len(weights))
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset, batch_size=opt.linear_batch_size, shuffle=(train_sampler is None),
+        num_workers=opt.num_workers, pin_memory=True, sampler=train_sampler)
+    
+    return train_loader
+
+
+# 検証用cifar10
+def set_valloader_co2l_cifar10(opt, normalize):
+
+    val_transform = transforms.Compose([
+        transforms.Resize(size=(opt.size, opt.size)),
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    target_classes = list(range(0, (opt.target_task+1)*opt.cls_per_task))
+
+    subset_indices = []
+    _val_dataset = datasets.CIFAR10(root=opt.data_folder,
+                                    train=False,
+                                    transform=val_transform)
+    for tc in target_classes:
+        subset_indices += np.where(np.array(_val_dataset.targets) == tc)[0].tolist()
+    val_dataset =  Subset(_val_dataset, subset_indices)
+
+    val_loader = torch.utils.data.DataLoader(
+        val_dataset, batch_size=256, shuffle=False,
+        num_workers=8, pin_memory=True)
+
+    return val_loader
+
+
+
+
+
+
+
+# ==============================================================
+# 訓練用cifar100
+# ==============================================================
+
+
+
+# cifar100データセットのクラスをsuperclassに倣って変更
+# fine(0..99) -> coarse(0..19)
+groups = [
+    # 0: aquatic mammals
+    [4, 30, 55, 72, 95],
+    # 1: fish
+    [1, 32, 67, 73, 91],
+    # 2: flowers
+    [54, 62, 70, 82, 92],
+    # 3: food containers
+    [9, 10, 16, 28, 61],
+    # 4: fruit and vegetables
+    [0, 51, 53, 57, 83],
+    # 5: household electrical devices
+    [22, 39, 40, 86, 87],
+    # 6: household furniture
+    [5, 20, 25, 84, 94],
+    # 7: insects
+    [6, 7, 14, 18, 24],
+    # 8: large carnivores
+    [3, 42, 43, 88, 97],
+    # 9: large man-made outdoor things
+    [12, 17, 37, 68, 76],
+    # 10: large natural outdoor scenes
+    [23, 33, 49, 60, 71],
+    # 11: large omnivores and herbivores
+    [15, 19, 21, 31, 38],
+    # 12: medium-sized mammals
+    [34, 63, 64, 66, 75],
+    # 13: non-insect invertebrates
+    [26, 45, 77, 79, 99],
+    # 14: people
+    [2, 11, 35, 46, 98],
+    # 15: reptiles
+    [27, 29, 44, 78, 93],
+    # 16: small mammals
+    [36, 50, 65, 74, 80],
+    # 17: trees
+    [47, 52, 56, 59, 96],
+    # 18: vehicles 1
+    [8, 13, 48, 58, 90],
+    # 19: vehicles 2
+    [41, 69, 81, 85, 89],
+]
+
+
+
+
+
+# 訓練用cifar100
+def set_loader_co2l_cifar100(opt, normalize, replay_indices):
+
+    train_transform = transforms.Compose([
+        transforms.Resize(size=(opt.size, opt.size)),
+        transforms.RandomResizedCrop(size=opt.size, scale=(0.1, 1.)),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomApply([
+            transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
+        ], p=0.8),
+        transforms.RandomGrayscale(p=0.2),
+        transforms.RandomApply([transforms.GaussianBlur(kernel_size=opt.size//20*2+1, sigma=(0.1, 2.0))], p=0.5 if opt.size>32 else 0.0),
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    # 現在タスクのクラス
+    target_classes = list(range(opt.target_task*opt.cls_per_task, (opt.target_task+1)*opt.cls_per_task))
+    print(target_classes)
+
+    subset_indices = []
+    _train_dataset = datasets.CIFAR100(root=opt.data_folder,
+                                       transform=TwoCropTransform(train_transform),
+                                       download=True)
+    
+    for tc in target_classes:
+        target_class_indices = np.where(np.array(_train_dataset.targets) == tc)[0]
+        subset_indices += np.where(np.array(_train_dataset.targets) == tc)[0].tolist()
+
+    subset_indices += replay_indices
+
+    train_dataset =  Subset(_train_dataset, subset_indices)
+    print('Dataset size: {}'.format(len(subset_indices)))
+    uk, uc = np.unique(np.array(_train_dataset.targets)[subset_indices], return_counts=True)
+    print(uc[np.argsort(uk)])
+
+    train_sampler = None
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset, batch_size=opt.batch_size, shuffle=(train_sampler is None),
+        num_workers=opt.num_workers, pin_memory=True, sampler=train_sampler, drop_last=True)
+
+    return train_loader, subset_indices
+
+
+# 線形層訓練用cifar100
+def set_linearloader_co2l_cifar100(opt, normalize, replay_indices):
+
+    train_transform = transforms.Compose([
+        transforms.Resize(size=(opt.size, opt.size)),
+        transforms.RandomResizedCrop(size=opt.size, scale=(0.1, 1.)),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomApply([
+            transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
+        ], p=0.8),
+        transforms.RandomGrayscale(p=0.2),
+        transforms.RandomApply([transforms.GaussianBlur(kernel_size=opt.size//20*2+1, sigma=(0.1, 2.0))], p=0.5 if opt.size>32 else 0.0),
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    target_classes = list(range(0, (opt.target_task+1)*opt.cls_per_task))
+
+    subset_indices = []
+    _train_dataset = datasets.CIFAR100(root=opt.data_folder,
+                                       transform=train_transform,
+                                       download=True)
+    
+    _train_targets = np.array(_train_dataset.targets)
+    for tc in range(opt.target_task*opt.cls_per_task, (opt.target_task+1)*opt.cls_per_task):
+        subset_indices += np.where(np.array(_train_dataset.targets) == tc)[0].tolist()
+
+
+    if isinstance(replay_indices, list):
+        subset_indices += replay_indices
+    elif isinstance(replay_indices, np.ndarray):
+        subset_indices += replay_indices.tolist()
+    else:
+        assert False
+
+
+    ut, uc = np.unique(_train_targets[subset_indices], return_counts=True)
+    print(ut)
+    print(uc)
+
+    weights = np.array([0.] * len(subset_indices))
+    for t, c in zip(ut, uc):
+        weights[_train_targets[subset_indices] == t] = 1./c
+
+    train_dataset =  Subset(_train_dataset, subset_indices)
+
+    train_sampler = WeightedRandomSampler(torch.Tensor(weights), len(weights))
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset, batch_size=opt.linear_batch_size, shuffle=(train_sampler is None),
+        num_workers=opt.num_workers, pin_memory=True, sampler=train_sampler)
+    
+    return train_loader
+
+
+# 検証用cifar100
+def set_valloader_co2l_cifar100(opt, normalize):
+
+    val_transform = transforms.Compose([
+        transforms.Resize(size=(opt.size, opt.size)),
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    target_classes = list(range(0, (opt.target_task+1)*opt.cls_per_task))
+
+    subset_indices = []
+    _val_dataset = datasets.CIFAR100(root=opt.data_folder,
+                                    train=False,
+                                    transform=val_transform)
+    
+    for tc in target_classes:
+        subset_indices += np.where(np.array(_val_dataset.targets) == tc)[0].tolist()
+    val_dataset =  Subset(_val_dataset, subset_indices)
+
+    val_loader = torch.utils.data.DataLoader(
+        val_dataset, batch_size=256, shuffle=False,
+        num_workers=8, pin_memory=True)
+
+    return val_loader
+    
+
+
+
+
+
+
+
+
+# ==============================================================
+# tiny-imagenet
+# ==============================================================
+def set_loader_co2l_tinyimagenet(opt, normalize, replay_indices):
+
+    train_transform = transforms.Compose([
+        transforms.Resize(size=(opt.size, opt.size)),
+        transforms.RandomResizedCrop(size=opt.size, scale=(0.2, 1.)),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomApply([
+            transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
+        ], p=0.8),
+        transforms.RandomGrayscale(p=0.2),
+        transforms.RandomApply([transforms.GaussianBlur(kernel_size=opt.size//20*2+1, sigma=(0.1, 2.0))], p=0.5 if opt.size>32 else 0.0),
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    # 現在タスクのクラス
+    target_classes = list(range(opt.target_task*opt.cls_per_task, (opt.target_task+1)*opt.cls_per_task))
+    print(target_classes)
+
+    subset_indices = []
+
+    _train_dataset = TinyImagenet(root=opt.data_folder,
+                                  transform=TwoCropTransform(train_transform),
+                                  download=True)
+    
+    for tc in target_classes:
+        target_class_indices = np.where(_train_dataset.targets == tc)[0]
+        subset_indices += np.where(_train_dataset.targets == tc)[0].tolist()
+
+    subset_indices += replay_indices
+
+    train_dataset =  Subset(_train_dataset, subset_indices)
+    print('Dataset size: {}'.format(len(subset_indices)))
+    uk, uc = np.unique(np.array(_train_dataset.targets)[subset_indices], return_counts=True)
+    print(uc[np.argsort(uk)])
+
+    train_sampler = None
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset, batch_size=opt.batch_size, shuffle=(train_sampler is None),
+        num_workers=opt.num_workers, pin_memory=True, sampler=train_sampler)
+
+    return train_loader, subset_indices
+
+
+# 線形層学習用tiny-imagenet
+def set_linearloader_co2l_tinyimagenet(opt, normalize, replay_indices):
+
+    train_transform = transforms.Compose([
+        transforms.Resize(size=(opt.size, opt.size)),
+        transforms.RandomResizedCrop(size=opt.size, scale=(0.2, 1.)),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomApply([
+            transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
+        ], p=0.8),
+        transforms.RandomGrayscale(p=0.2),
+        transforms.RandomApply([transforms.GaussianBlur(kernel_size=opt.size//20*2+1, sigma=(0.1, 2.0))], p=0.5 if opt.size>32 else 0.0),
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    target_classes = list(range(0, (opt.target_task+1)*opt.cls_per_task))
+
+    subset_indices = []
+    _train_dataset = TinyImagenet(root=opt.data_folder,
+                                  transform=train_transform,
+                                  download=True)
+    _train_targets = np.array(_train_dataset.targets)
+    for tc in range(opt.target_task*opt.cls_per_task, (opt.target_task+1)*opt.cls_per_task):
+        subset_indices += np.where(np.array(_train_dataset.targets) == tc)[0].tolist()
+    
+
+    if isinstance(replay_indices, list):
+        subset_indices += replay_indices
+    elif isinstance(replay_indices, np.ndarray):
+        subset_indices += replay_indices.tolist()
+    else:
+        assert False
+
+    ut, uc = np.unique(_train_targets[subset_indices], return_counts=True)
+    print(ut)
+    print(uc)
+
+    weights = np.array([0.] * len(subset_indices))
+    for t, c in zip(ut, uc):
+        weights[_train_targets[subset_indices] == t] = 1./c
+
+    train_dataset =  Subset(_train_dataset, subset_indices)
+
+    train_sampler = WeightedRandomSampler(torch.Tensor(weights), len(weights))
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset, batch_size=opt.linear_batch_size, shuffle=(train_sampler is None),
+        num_workers=opt.num_workers, pin_memory=True, sampler=train_sampler)
+    
+    return train_loader
+
+
+# 検証用tiny-imagenet
+def set_valloader_co2l_tinyimagenet(opt, normalize):
+
+    val_transform = transforms.Compose([
+        transforms.Resize(size=(opt.size, opt.size)),
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    target_classes = list(range(0, (opt.target_task+1)*opt.cls_per_task))
+
+    subset_indices = []
+    _val_dataset = TinyImagenet(root=opt.data_folder,
+                                    train=False,
+                                    transform=val_transform)
+    for tc in target_classes:
+        subset_indices += np.where(np.array(_val_dataset.targets) == tc)[0].tolist()
+    val_dataset =  Subset(_val_dataset, subset_indices)
+
+    val_loader = torch.utils.data.DataLoader(
+        val_dataset, batch_size=256, shuffle=False,
+        num_workers=8, pin_memory=True)
+
+    return val_loader
+
+
+
+
+

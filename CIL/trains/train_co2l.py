@@ -914,7 +914,7 @@ def val_co2l(opt, model, model2, linear_loader, val_loader, taskil_loaders, knn_
     # 損失関数の作成
     criterion = torch.nn.CrossEntropyLoss()
 
-    for epoch in range(1, 2):
+    for epoch in range(1, opt.linear_epochs):
 
         # modelをevalモード，classifierをtrainモードに変更
         model.eval()

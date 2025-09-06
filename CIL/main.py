@@ -29,7 +29,7 @@ def parse_option():
     # 手法
     parser.add_argument('--method', type=str, default="",
                         choices=['er', 'co2l', 'gpm', 'lucir', 'fs-dgpm', 'cclis', 'supcon', 'supcon-joint', 'simclr',
-                                 'cclis-bw','cclis-wo', 'cclis-wo-replay', 'cclis-wo-ss', 'cclis-wo-is', 'cclis-rfr', 'cclis-grad'])
+                                 'cclis-bw','cclis-wo', 'cclis-wo-replay', 'cclis-wo-ss', 'cclis-wo-is', 'cclis-rfr', 'cclis-pcgrad'])
 
     # logの名前（実行毎に変えてね）
     parser.add_argument('--log_name', type=str, default="practice")
@@ -231,7 +231,6 @@ def make_setup(opt):
                               momentum=opt.momentum,
                               weight_decay=opt.weight_decay)
         method_tools = {"optimizer": optimizer}
-
     
     elif opt.method == "co2l":
 
@@ -358,6 +357,46 @@ def make_setup(opt):
                             lr=learning_rate,
                             momentum=opt.momentum,
                             weight_decay=opt.weight_decay)
+        method_tools = {"optimizer": optimizer, "importance_weight": None, "score": None,
+                        "score_mask": None, "subset_sample_num": None, "post_loader": None, "val_targets": None}
+
+    elif opt.method in ['cclis-pcgrad']:
+
+        from losses.loss_cclis import ISSupConLoss
+        from optimizers.pcgrad import PCGrad
+
+        if opt.dataset in ["cifar10", "cifar100", "tiny-imagenet"]:
+            from models.resnet_cifar_cclis import SupConResNet
+        elif opt.dataset in ["imagemet"]:
+            assert False
+        
+        model = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed, opt=opt)
+        model2 = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed, opt=opt)
+        criterion = ISSupConLoss(temperature=opt.temp, opt=opt)
+
+        # optimizer = optim.SGD(model.parameters(),
+        #                         lr=opt.learning_rate,
+        #                         momentum=opt.momentum,
+        #                         weight_decay=opt.weight_decay)
+
+
+        if 'prototypes.weight' in model.state_dict().keys():
+            optimizer = optim.SGD([
+                            {'params': model.encoder.parameters()},
+                            {'params': model.head.parameters()},
+                            {'params': model.prototypes.parameters(), 'lr': opt.learning_rate_prototypes},
+                            ],
+                            lr=opt.learning_rate,
+                            momentum=opt.momentum,
+                            weight_decay=opt.weight_decay)
+        else:
+            learning_rate =  opt.learning_rate
+            optimizer = optim.SGD(model.parameters(),
+                            lr=learning_rate,
+                            momentum=opt.momentum,
+                            weight_decay=opt.weight_decay)
+        
+        optimizer = PCGrad(optimizer)
         method_tools = {"optimizer": optimizer, "importance_weight": None, "score": None,
                         "score_mask": None, "subset_sample_num": None, "post_loader": None, "val_targets": None}
 
@@ -557,7 +596,7 @@ def make_scheduler(opt, epochs, dataloader, method_tools):
         else:
             scheduler = lr_scheduler.OneCycleLR(optimizer, max_lr=opt.learning_rate, total_steps=total_steps, pct_start=0.1, anneal_strategy='cos')
     
-    elif opt.method in ["cclis", "cclis-bw", "cclis-wo", "cclis-rfr", "cclis-grad"]:   # 別の方法でschedulerを実装
+    elif opt.method in ["cclis", "cclis-bw", "cclis-wo", "cclis-rfr", "cclis-grad", "cclis-pcgrad"]:   # 別の方法でschedulerを実装
         scheduler = None
     else:
         assert False
@@ -642,6 +681,12 @@ def main():
 
         # schedulerの作成
         scheduler, method_tools = make_scheduler(opt=opt, epochs=opt.epochs, dataloader=dataloader["train"], method_tools=method_tools)
+
+        # ランダム初期化のモデルを保存
+        if opt.target_task == 0:
+            file_path = f"{opt.model_path}/model_random.pth"
+            # save_model(model, method_tools["optimizer"], opt, opt.epochs, file_path)
+            save_model(model, method_tools["optimizer"], opt, opt.epochs, file_path)
 
         # 訓練を実行
         for epoch in range(1, opt.epochs+1):

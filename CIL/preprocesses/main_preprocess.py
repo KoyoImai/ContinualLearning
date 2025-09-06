@@ -55,7 +55,7 @@ def pre_process(opt, model, model2,  dataloader, method_tools):
     elif opt.method in ["fs-dgpm"]:
         model, method_tools = preprocess_fsdgpm(opt, model, method_tools)
         return method_tools, model, model2
-    elif opt.method in ["cclis", "cclis-wo", "cclis-bw", "cclis-rfr"]:
+    elif opt.method in ["cclis", "cclis-wo", "cclis-bw", "cclis-rfr", "cclis-pcgrad"]:
         preprocess_cclis(opt, model, method_tools)
         # print("opt.warm: ", opt.warm)
         # assert False
