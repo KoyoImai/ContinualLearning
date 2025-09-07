@@ -110,6 +110,7 @@ def set_loader_co2l_cifar10(opt, normalize, replay_indices):
 # 線形層訓練用cifar10
 def set_linearloader_co2l_cifar10(opt, normalize, replay_indices):
 
+
     train_transform = transforms.Compose([
         transforms.Resize(size=(opt.size, opt.size)),
         transforms.RandomResizedCrop(size=opt.size, scale=(0.1, 1.)),
@@ -142,6 +143,9 @@ def set_linearloader_co2l_cifar10(opt, normalize, replay_indices):
     else:
         assert False
 
+    # print("len(replay_indices): ", len(replay_indices))
+    # print("len(subset_indices): ", len(subset_indices))
+    # assert False
 
     ut, uc = np.unique(_train_targets[subset_indices], return_counts=True)
     print(ut)

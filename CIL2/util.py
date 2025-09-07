@@ -95,7 +95,7 @@ def write_csv(value, path, file_name, task, epoch):
             writer = csv.writer(csvfile)
             # ヘッダー行を定義（必要に応じて適宜変更）
             if isinstance(value, list):
-                header = ["task"] + ["epoch"] + [f"value_{i+1}" for i in range(len(value))]
+                header = ["task"] + ["epoch"] + [f"task_{i+1}" for i in range(len(value))]
             else:
                 header = ["task", "epoch", "value"]
             writer.writerow(header)
