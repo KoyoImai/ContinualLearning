@@ -82,6 +82,7 @@ def parse_option():
     parser.add_argument('--date', type=str, default='2024_0101')
     parser.add_argument('--print_freq', type=int, default=10)
     parser.add_argument('--val_freq', type=int, default=50)
+    parser.add_argument('--eval', action='store_true')
     parser.add_argument('--epoch_save', default=False, action='store_true')   # エポック毎にモデルを保存
 
 

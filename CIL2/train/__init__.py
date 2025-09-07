@@ -31,7 +31,7 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
         loss, model2 = train_co2l(opt=opt, model=model, model2=model2, criterion=criterion, optimizer=optimizer,
                                   scheduler=scheduler, train_loader=train_loader, epoch=epoch)
     
-        if epoch % opt.val_freq == 0:
+        if opt.eval and (epoch % opt.val_freq == 0):
             classil_acc, taskil_acc, all_task_accuracies, all_task_knn_accuracies, all_task_losses, classifier = val_co2l(opt, model, model2, linear_loader, val_loader, taskil_loaders, knn_train_loaders, epoch)
 
             # 各タスクの精度を「task0 acc=100.00, task1 acc=90.00」の形式で整形
@@ -61,7 +61,7 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
         loss, model2 = train_cclis(opt=opt, model=model, model2=model2, criterion=criterion, optimizer=optimizer,
                                    train_loader=train_loader, epoch=epoch, subset_sample_num=subset_sample_num, score_mask=score_mask)
 
-        if epoch % opt.val_freq == 0:
+        if opt.eval and (epoch % opt.val_freq == 0):
             classil_acc, taskil_acc, all_task_accuracies, all_task_knn_accuracies, all_task_losses, classifier = val_cclis(opt, model, model2, linear_loader, val_loader, taskil_loaders, knn_train_loaders, epoch)
 
             # 各タスクの精度を「task0 acc=100.00, task1 acc=90.00」の形式で整形
