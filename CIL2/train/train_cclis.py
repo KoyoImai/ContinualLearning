@@ -324,7 +324,9 @@ def val_cclis(opt, model, model2, linear_loader, val_loader, taskil_loaders, knn
                 bsz = labels.shape[0]
 
                 # forward
-                output = classifier(model.module.encoder(images))
+                with torch.no_grad():
+                    features = model.module.encoder(images)
+                output = classifier(features)
                 loss = criterion(output, labels)
 
                 # update metric
@@ -392,7 +394,10 @@ def taskil_val_cclis(opt, model, classifier,  criterion, val_loaders):
                 labels = labels.cuda()
                 bsz = labels.shape[0]
 
-                y_pred = classifier(model.module.encoder(images))
+                # forward
+                with torch.no_grad():
+                    features = model.module.encoder(images)
+                y_pred = classifier(features)
 
                 # 出力のクラス範囲を制限
                 start_class = idx * opt.cls_per_task
@@ -509,7 +514,8 @@ def knn_val_cclis(opt, model, val_loaders, train_loaders):
                 bsz = labels.shape[0]
                 
                 # 特徴量を取得
-                features = model.module.encoder(images)
+                with torch.no_grad():
+                    features = model.module.encoder(images)
 
                 # 特徴量とラベルを保存
                 all_val_features.append(features.cpu())

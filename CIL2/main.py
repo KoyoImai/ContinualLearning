@@ -29,7 +29,7 @@ def parse_option():
 
     # 基本的な実験設定
     parser.add_argument("--log_name", type=str, default="test")
-    parser.add_argument('--method', type=str, default='cclis', choices=['er', 'co2l', 'cclis'])
+    parser.add_argument('--method', type=str, default='cclis', choices=['er', 'co2l', 'cclis', 'prco'])
 
     # データセット関連
     parser.add_argument('--data_folder', type=str, default='/home/kouyou/Datasets/', help='path to custom dataset')
@@ -72,6 +72,9 @@ def parse_option():
     parser.add_argument('--cosine', default=False, action='store_true')
     parser.add_argument('--distill_type', type=str, default="PRD")
     parser.add_argument('--max_iter', type=int, default=5, help='iterations of the score computing')
+
+    # prco
+    
 
     # その他の設定
     parser.add_argument('--seed', type=int, default=777)
