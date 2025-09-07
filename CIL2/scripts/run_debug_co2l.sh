@@ -2,11 +2,50 @@
 
 export CUDA_VISIBLE_DEVICES="0"
 
-# python main.py --method co2l --cosine --start_epoch 11 --epochs 11 --val_freq 10 --linear_epochs 3 --log_name test --date 0906
 
-python ./main.py --method co2l --mem_type ring --dataset cifar10 --batch_size 512 --epochs 11 --start_epoch 11  --epoch_save \
-               --learning_rate 0.5 --mem_size 500 --current_temp 0.2 --past_temp 0.01 --distill_power 1.0 \
-               --seed 0 --linear_learning_rate 1.0 --log_name test2 --date 2025_0906
+
+
+# 基本設定（log_name関連）
+export METHOD="co2l"
+export MEM_TYPE="ring"
+export MEM_SIZE=500
+export DATASET="cifar100"
+export SEED=0
+export LOG_NAME="test2"
+export DATE="2025_0907"
+
+# 学習のハイパラ関連
+export BATCH_SIZE=512
+export LEARNING_RATE=0.5
+export EPOCHS=100
+export START_EPOCH=500
+
+
+# Co2L特有設定
+export TEMP_CO2L=0.5
+export CURRENT_TEMP=0.2
+export PAST_TEMP=0.01
+export DISTILL_POWER=0.6
+
+
+# 線形分類関連のハイパラ
+export LINEAR_LEARNING_RATE=0.5
+export LINEAR_EPOCHS=2
+export VAL_FREQ=1000
+
+
+
+
+# python ./main.py --method ${METHOD} --mem_type ${MEM_TYPE} --mem_size ${MEM_SIZE} --dataset ${DATASET} --seed ${SEED} --log_name ${LOG_NAME} --date ${DATE} \
+#                  --batch_size ${BATCH_SIZE} --learning_rate ${LEARNING_RATE} --epochs ${EPOCHS} --start_epoch ${START_EPOCH} \
+#                  --temp_co2l ${TEMP_CO2L} --current_temp ${CURRENT_TEMP} --past_temp ${PAST_TEMP} --distill_power ${DISTILL_POWER} \
+#                  --linear_learning_rate ${LINEAR_LEARNING_RATE} --linear_epochs ${LINEAR_EPOCHS} --val_freq ${VAL_FREQ} \
+#                  --epoch_save 
+
+
+python ./main_linear.py --method ${METHOD} --mem_type ${MEM_TYPE} --mem_size ${MEM_SIZE} --dataset ${DATASET} --seed ${SEED} --log_name ${LOG_NAME} --date ${DATE} \
+                        --linear_learning_rate ${LINEAR_LEARNING_RATE} --linear_epochs ${LINEAR_EPOCHS} \
+                        --target_task 0 --target_epoch 1
 
 
 

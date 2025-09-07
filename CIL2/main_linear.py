@@ -60,19 +60,19 @@ def parse_option():
     parser.add_argument('--offline', action='store_true', help='offline learning')
 
     # co2lのハイパーパラメータ
-    parser.add_argument('--temp_co2l', type=float, default=0.5)
-    parser.add_argument('--current_temp', type=float, default=0.2)
-    parser.add_argument('--past_temp', type=float, default=0.1)
-    parser.add_argument('--distill_power', type=float, default=0.1)
-    parser.add_argument('--not_asym', default=False, action='store_true')
+    # parser.add_argument('--temp_co2l', type=float, default=0.5)
+    # parser.add_argument('--current_temp', type=float, default=0.2)
+    # parser.add_argument('--past_temp', type=float, default=0.1)
+    # parser.add_argument('--distill_power', type=float, default=0.1)
+    # parser.add_argument('--not_asym', default=False, action='store_true')
 
     # cclisのハイパーパラメータ
-    parser.add_argument('--temp_cclis', type=float, default=0.5)
-    parser.add_argument('--wo_is', action='store_true')
-    parser.add_argument('--learning_rate_prototypes', type=float, default=0.01)
-    parser.add_argument('--cosine', default=False, action='store_true')
-    parser.add_argument('--distill_type', type=str, default="PRD")
-    parser.add_argument('--max_iter', type=int, default=5, help='iterations of the score computing')
+    # parser.add_argument('--temp_cclis', type=float, default=0.5)
+    # parser.add_argument('--wo_is', action='store_true')
+    # parser.add_argument('--learning_rate_prototypes', type=float, default=0.01)
+    # parser.add_argument('--cosine', default=False, action='store_true')
+    # parser.add_argument('--distill_type', type=str, default="PRD")
+    # parser.add_argument('--max_iter', type=int, default=5, help='iterations of the score computing')
 
     # prco
     

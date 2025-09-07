@@ -148,8 +148,8 @@ def val_co2l(opt, model, model2, linear_loader, val_loader, taskil_loaders, knn_
     # classifierのOptimizer
     optimizer = optim.SGD(classifier.parameters(),
                           lr=opt.linear_learning_rate,
-                          momentum=opt.momentum,
-                          weight_decay=opt.weight_decay)
+                          momentum=opt.linear_momentum,
+                          weight_decay=opt.linear_weight_decay)
 
     # schedulerの設定
     scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[60, 75, 90], gamma=0.2)
