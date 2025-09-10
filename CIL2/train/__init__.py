@@ -5,6 +5,8 @@ import logging
 from util import save_classifier, write_csv
 from train.train_co2l import train_co2l, val_co2l, ncm_co2l
 from train.train_cclis import train_cclis, val_cclis, ncm_cclis, adjust_learning_rate_cclis
+from train.train_prco import train_prco, adjust_learning_rate_prco
+
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +82,14 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
             if not os.path.exists(dir_path):
                 os.makedirs(dir_path)
             save_classifier(classifier, opt, opt.epochs, file_path)
+        
+
+    elif opt.method == "prco":
+
+        adjust_learning_rate_cclis(opt, optimizer, epoch)
+
+        loss, model2 = train_prco(opt=opt, model=model, model2=model2, criterion=criterion,
+                                  optimizer=optimizer, train_loader=train_loader, epoch=epoch)
 
     
     else:
@@ -108,6 +118,10 @@ def eval(model, dataloader, opt):
     elif opt.method == "co2l":
 
         classil_acc, taskil_acc, all_task_accuracies, all_task_knn_accuracies, all_task_losses, classifier = val_co2l(opt, model, None, linear_loader, val_loader, taskil_loaders, knn_train_loaders, opt.target_epoch)
+        write_csv(classil_acc, opt.result_path, "classil_acc", opt.target_task, opt.target_epoch)
+        write_csv(taskil_acc, opt.result_path, "taskil_acc", opt.target_task, opt.target_epoch)
+        write_csv(all_task_accuracies, opt.result_path, "all_task_acc", opt.target_task, opt.target_epoch)
+        write_csv(all_task_knn_accuracies, opt.result_path, "all_task_knn_acc", opt.target_task, opt.target_epoch)
 
     elif opt.method == "cclis":
 

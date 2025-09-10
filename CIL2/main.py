@@ -73,7 +73,8 @@ def parse_option():
     parser.add_argument('--distill_type', type=str, default="PRD")
     parser.add_argument('--max_iter', type=int, default=5, help='iterations of the score computing')
 
-    # prco
+    # prcoのハイパーパラメータ（一部のハイパラはCo2L・CCLISと共通）
+    parser.add_argument('--temp_prco', type=float, default=0.5)
     
 
     # その他の設定
@@ -213,6 +214,36 @@ def make_setup(opt):
                             weight_decay=opt.weight_decay)
         method_tools = {"optimizer": optimizer}
 
+    elif opt.method in ["prco"]:
+
+        from losses.loss_prco import ProtoSupConLoss
+
+        if opt.dataset in ["cifar10", "cifar100", "tiny-imagenet"]:
+            from models.resnet_cifar_prco import SupConResNet
+        elif opt.dataset in ["imagenet"]:
+            assert False
+
+        model = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed, opt=opt)
+        model2 = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed, opt=opt)
+        criterion = ProtoSupConLoss(temperature=opt.temp_prco, opt=opt)
+
+        if 'prototypes.weight' in model.state_dict().keys():
+            optimizer = optim.SGD([
+                            {'params': model.encoder.parameters()},
+                            {'params': model.head.parameters()},
+                            {'params': model.prototypes.parameters(), 'lr': opt.learning_rate_prototypes},
+                            ],
+                            lr=opt.learning_rate,
+                            momentum=opt.momentum,
+                            weight_decay=opt.weight_decay)
+        else:
+            learning_rate =  opt.learning_rate
+            optimizer = optim.SGD(model.parameters(),
+                            lr=learning_rate,
+                            momentum=opt.momentum,
+                            weight_decay=opt.weight_decay)
+        method_tools = {"optimizer": optimizer}
+    
     else:
 
         assert False
@@ -225,11 +256,6 @@ def make_setup(opt):
 
         model = torch.nn.DataParallel(model)
         model2 = torch.nn.DataParallel(model2)
-
-        # model.ptorotypes = torch.nn.DataParallel(model.module.prototypes)
-        # model2.ptorotypes = torch.nn.DataParallel(model2.module.prototypes)
-
-    
 
     return model, model2, criterion, method_tools
     
@@ -256,6 +282,12 @@ def make_scheduler(opt, epochs, dataloader, method_tools):
     
     elif opt.method in ["cclis"]:
         scheduler = None
+
+    elif opt.method in ["prco"]:
+        scheduler = None
+    
+    else:
+        assert False
 
     return scheduler, method_tools
 

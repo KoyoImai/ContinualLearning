@@ -17,7 +17,8 @@ from dataloaders.dataloader_co2l import set_loader_co2l_tinyimagenet, set_linear
 # cclis
 from dataloaders.dataloader_cclis import set_loader_cclis_cifar10, set_loader_cclis_cifar100, set_loader_cclis_tinyimagenet
 
-
+# prco
+from dataloaders.dataloader_prco import set_loader_prco_cifar10
 
 
 
@@ -101,6 +102,22 @@ def set_loader(opt, model, replay_indices, method_tools):
         # method_tools["post_loader"] = post_loader
         model.module.subset_sample_num = subset_sample_num
         model.module.post_loader = post_loader
+    
+    elif opt.method in ["prco"]:
+
+        if opt.dataset == "cifar10":
+            train_loader, subset_indices, subset_sample_num = set_loader_prco_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices, model=model)
+            val_loader = set_valloader_co2l_cifar10(opt=opt, normalize=normalize)
+            linear_loader = set_linearloader_co2l_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices)
+        elif opt.dataset == "cifar100":
+            assert False
+        elif opt.dataset == "tiny-imagenet":
+            assert False
+
+
+        
+
+
     
 
     # データ拡張も特に加えていない現在タスクのデータローダ
@@ -238,6 +255,10 @@ def set_buffer(opt, model, prev_indices=None, method_tools=None):
         # method_tools["val_targets"] = val_targets
         model.module.importance_weight = importance_weight
         model.module.val_targets = val_targets
+    
+    elif opt.method in ["prco"]:
+        from dataloaders.buffer_er import set_replay_samples_ring
+        replay_indices = set_replay_samples_ring(opt, model, prev_indices=prev_indices) 
 
 
     

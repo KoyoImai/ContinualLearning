@@ -19,6 +19,9 @@ def post_process(opt, model, model2, dataloader, criterion, method_tools, replay
         postprocess_cclis(opt, model, model2, criterion, replay_indices)
         return 
 
+    elif opt.method in ["prco"]:
+        return 
+    
     else:
         assert False
 
