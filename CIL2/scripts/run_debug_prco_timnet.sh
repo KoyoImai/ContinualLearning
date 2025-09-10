@@ -8,9 +8,9 @@ export CUDA_VISIBLE_DEVICES="3"
 export METHOD="prco"
 export MEM_TYPE="ring"
 export MEM_SIZE=500
-export DATASET="cifar10"
+export DATASET="tiny-imagenet"
 export SEED=0
-export LOG_NAME="test2"
+export LOG_NAME="test4timnet"
 export DATE="2025_0910"
 
 
@@ -54,7 +54,7 @@ export VAL_FREQ=1000
 for TASKID in {2..10} ; do
     echo ${TASKID}
     for EPOCH in {1..3} ; do
-        python ./main_linear.py --method ${METHOD} --mem_type ${MEM_TYPE} --mem_size ${MEM_SIZE} --dataset ${DATASET} --seed ${SEED} --log_name ${LOG_NAME} --date ${DATE} \
+        python ./main_linear4timnet.py --method ${METHOD} --mem_type ${MEM_TYPE} --mem_size ${MEM_SIZE} --dataset ${DATASET} --seed ${SEED} --log_name ${LOG_NAME} --date ${DATE} \
                 --linear_learning_rate ${LINEAR_LEARNING_RATE} --linear_epochs ${LINEAR_EPOCHS} \
                 --target_task ${TASKID} --target_epoch ${EPOCH}
     done

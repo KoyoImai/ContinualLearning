@@ -71,7 +71,7 @@ python ./main_linear.py --method ${METHOD} --mem_type ${MEM_TYPE} --dataset ${DA
 
 
 
-for TASKID in {2..5} ; do
+for TASKID in {1..5} ; do
     echo ${TASKID}
     for EPOCH in {1..100} ; do
         python ./ContinualLearning3/CIL2/main_linear.py --method ${METHOD} --mem_type ${MEM_TYPE} --mem_size ${MEM_SIZE} --dataset ${DATASET} --seed ${SEED} --log_name ${LOG_NAME} --date ${DATE} \

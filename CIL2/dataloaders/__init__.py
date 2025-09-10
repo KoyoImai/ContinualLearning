@@ -97,7 +97,7 @@ def set_loader(opt, model, replay_indices, method_tools):
 
         elif opt.dataset == 'tiny-imagenet':
             train_loader, subset_indices, subset_sample_num = set_loader_cclis_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices, model=model)
-            post_loader, _, _ = set_loader_cclis_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices, method_tools=method_tools, training=False)
+            post_loader, _, _ = set_loader_cclis_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices, model=model, training=False)
             # val_loader = set_valloader_co2l_tinyimagenet(opt=opt, normalize=normalize)
             # linear_loader = set_linearloader_co2l_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices)
             val_loader = None
@@ -219,6 +219,35 @@ def set_loader_eval(opt, model, replay_indices, method_tools):
 
 
     dataloaders = {"val": val_loader, "linear": linear_loader, "ncm": ncm_loader, "taskil": taskil_loaders, "knn": knn_loaders}
+
+    return dataloaders
+
+
+# ====================================================
+# tiny-imagenet専用，検証用データローダーメインの作成
+# ====================================================
+def set_loader_eval4timnet(opt, model, replay_indices, method_tools):
+
+    if opt.dataset == 'tiny-imagenet':
+        mean = (0.4802, 0.4480, 0.3975)
+        std = (0.2770, 0.2691, 0.2821)
+    elif opt.dataset == 'path':
+        mean = eval(opt.mean)
+        std = eval(opt.mean)
+    else:
+        raise ValueError('dataset not supported: {}'.format(opt.dataset))
+
+    normalize = transforms.Normalize(mean=mean, std=std)
+
+
+    if opt.dataset == 'tiny-imagenet':
+        val_loader = set_valloader_co2l_tinyimagenet(opt=opt, normalize=normalize)
+        linear_loader = set_linearloader_co2l_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices)
+        taskil_loaders = set_taskil_valloader_er_tinyimagenet(opt=opt, normalize=normalize)
+        taskil_loaders = None
+
+
+    dataloaders = {"val": val_loader, "linear": linear_loader, "taskil": taskil_loaders}
 
     return dataloaders
 
