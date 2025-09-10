@@ -370,136 +370,6 @@ def val_cclis(opt, model, model2, linear_loader, val_loader, taskil_loaders, knn
 
 
 
-
-def val_cclis4timnet(opt, model, model2, linear_loader, val_loader, taskil_loaders, epoch):
-
-    # classifierの準備
-    classifier = LinearClassifier(name="resnet18", num_classes=opt.n_cls, seed=opt.seed)
-    if torch.cuda.is_available():
-        classifier = classifier.cuda()
-
-
-    # classifierのOptimizer
-    optimizer = optim.SGD(classifier.parameters(),
-                          lr=opt.linear_learning_rate,
-                          momentum=opt.linear_momentum,
-                          weight_decay=opt.linear_weight_decay)
-
-    # schedulerの設定
-    scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[60, 75, 90], gamma=0.2)
-
-    # 損失関数の作成
-    criterion = torch.nn.CrossEntropyLoss()
-
-    for epoch in range(1, opt.linear_epochs):
-
-        # modelをevalモード，classifierをtrainモードに変更
-        model.eval()
-        classifier.train()
-
-        losses = AverageMeter()
-
-        # 1エポック分の学習
-        for idx, (images, labels) in enumerate(linear_loader):
-
-            images = images.cuda(non_blocking=True)
-            labels = labels.cuda(non_blocking=True)
-            bsz = labels.shape[0]
-
-            # 特徴量獲得
-            with torch.no_grad():
-                features = model.module.encoder(images)
-            output = classifier(features.detach())
-            loss = criterion(output, labels)
-
-            # update metric
-            losses.update(loss.item(), bsz)
-            # cnt += bsz
-
-            # 最適化ステップ
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-            # 現在の学習率
-            current_lr = optimizer.param_groups[0]['lr']
-
-            # 学習記録の表示
-            if (idx+1) % opt.print_freq == 0 or idx+1 == len(linear_loader):
-                print('Train: [{0}][{1}/{2}]\t'
-                      'loss {loss.val:.3f} ({loss.avg:.3f})'.format(
-                      epoch, idx + 1, len(linear_loader), loss=losses))
-
-
-        # 検証（これまでの全てのタスクを使用）
-        model.eval()
-        classifier.eval()
-
-        losses = AverageMeter()
-
-        corr = [0.] * (opt.target_task + 1) * opt.cls_per_task
-        cnt  = [0.] * (opt.target_task + 1) * opt.cls_per_task
-        correct_task = 0.0
-
-        with torch.no_grad():
-            for idx, (images, labels) in enumerate(val_loader):
-                images = images.float().cuda()
-                labels = labels.cuda()
-                bsz = labels.shape[0]
-
-                # forward
-                with torch.no_grad():
-                    features = model.module.encoder(images)
-                output = classifier(features)
-                loss = criterion(output, labels)
-
-                # update metric
-                losses.update(loss.item(), bsz)
-
-                #
-                cls_list = np.unique(labels.cpu())
-                correct_all = (output.argmax(1) == labels)
-
-                for tc in cls_list:
-                    mask = labels == tc
-                    correct_task += (output[mask, (tc // opt.cls_per_task) * opt.cls_per_task : ((tc // opt.cls_per_task)+1) * opt.cls_per_task].argmax(1) == (tc % opt.cls_per_task)).float().sum()
-
-                for c in cls_list:
-                    mask = labels == c
-                    corr[c] += correct_all[mask].float().sum().item()
-                    cnt[c] += mask.float().sum().item()
-                
-                # if idx % opt.print_freq == 0:
-                #     print('Test: [{0}/{1}]\t'
-                #         'Acc@1 {top1:.3f} {task_il:.3f}\t'
-                #         'lr {lr:.5f}'.format(
-                #             idx, len(val_loader),top1=np.sum(corr)/np.sum(cnt)*100., task_il=correct_task/np.sum(cnt)*100., lr=current_lr
-                #         ))
-                print('Test: [{0}/{1}]\t'
-                    'Acc@1 {top1:.3f} {task_il:.3f}\t'
-                    'lr {lr:.5f}'.format(
-                        idx, len(val_loader),top1=np.sum(corr)/np.sum(cnt)*100., task_il=correct_task/np.sum(cnt)*100., lr=current_lr
-                    ))
-        print(' * Acc@1 {top1:.3f} {task_il:.3f}'.format(top1=np.sum(corr)/np.sum(cnt)*100., task_il=correct_task/np.sum(cnt)*100.))
-
-        # 学習率の調整
-        scheduler.step()
-
-    # 検証（これまで学習した各タスク毎に）
-    # all_task_accuracies, all_task_losses = taskil_val_cclis(opt, model, classifier, criterion, taskil_loaders)
-    # all_task_knn_accuracies = knn_val_cclis(opt, model, taskil_loaders, knn_train_loaders)
-    # print("all_task_knn_accuracies: ", all_task_knn_accuracies)
-
-    classil_acc = np.sum(corr)/np.sum(cnt)*100.
-    taskil_acc = correct_task/np.sum(cnt)*100.
-
-
-    # return classil_acc, taskil_acc, all_task_accuracies, all_task_losses, classifier
-    return classil_acc, taskil_acc, classifier
-
-
-
-
 def taskil_val_cclis(opt, model, classifier,  criterion, val_loaders):
 
     # modelをevalモードに変更
@@ -760,3 +630,130 @@ def ncm_cclis(model, ncm_loader, val_loader):
 
 
 
+
+
+def val_cclis4timnet(opt, model, model2, linear_loader, val_loader, taskil_loaders, epoch):
+
+    # classifierの準備
+    classifier = LinearClassifier(name="resnet18", num_classes=opt.n_cls, seed=opt.seed)
+    if torch.cuda.is_available():
+        classifier = classifier.cuda()
+
+
+    # classifierのOptimizer
+    optimizer = optim.SGD(classifier.parameters(),
+                          lr=opt.linear_learning_rate,
+                          momentum=opt.linear_momentum,
+                          weight_decay=opt.linear_weight_decay)
+
+    # schedulerの設定
+    scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=[60, 75, 90], gamma=0.2)
+
+    # 損失関数の作成
+    criterion = torch.nn.CrossEntropyLoss()
+
+    for epoch in range(1, opt.linear_epochs):
+
+        # modelをevalモード，classifierをtrainモードに変更
+        model.eval()
+        classifier.train()
+
+        losses = AverageMeter()
+
+        # 1エポック分の学習
+        for idx, (images, labels) in enumerate(linear_loader):
+
+            images = images.cuda(non_blocking=True)
+            labels = labels.cuda(non_blocking=True)
+            bsz = labels.shape[0]
+
+            # 特徴量獲得
+            with torch.no_grad():
+                features = model.module.encoder(images)
+            output = classifier(features.detach())
+            loss = criterion(output, labels)
+
+            # update metric
+            losses.update(loss.item(), bsz)
+            # cnt += bsz
+
+            # 最適化ステップ
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            # 現在の学習率
+            current_lr = optimizer.param_groups[0]['lr']
+
+            # 学習記録の表示
+            if (idx+1) % opt.print_freq == 0 or idx+1 == len(linear_loader):
+                print('Train: [{0}][{1}/{2}]\t'
+                      'loss {loss.val:.3f} ({loss.avg:.3f})'.format(
+                      epoch, idx + 1, len(linear_loader), loss=losses))
+
+
+        # 検証（これまでの全てのタスクを使用）
+        model.eval()
+        classifier.eval()
+
+        losses = AverageMeter()
+
+        corr = [0.] * (opt.target_task + 1) * opt.cls_per_task
+        cnt  = [0.] * (opt.target_task + 1) * opt.cls_per_task
+        correct_task = 0.0
+
+        with torch.no_grad():
+            for idx, (images, labels) in enumerate(val_loader):
+                images = images.float().cuda()
+                labels = labels.cuda()
+                bsz = labels.shape[0]
+
+                # forward
+                with torch.no_grad():
+                    features = model.module.encoder(images)
+                output = classifier(features)
+                loss = criterion(output, labels)
+
+                # update metric
+                losses.update(loss.item(), bsz)
+
+                #
+                cls_list = np.unique(labels.cpu())
+                correct_all = (output.argmax(1) == labels)
+
+                for tc in cls_list:
+                    mask = labels == tc
+                    correct_task += (output[mask, (tc // opt.cls_per_task) * opt.cls_per_task : ((tc // opt.cls_per_task)+1) * opt.cls_per_task].argmax(1) == (tc % opt.cls_per_task)).float().sum()
+
+                for c in cls_list:
+                    mask = labels == c
+                    corr[c] += correct_all[mask].float().sum().item()
+                    cnt[c] += mask.float().sum().item()
+                
+                # if idx % opt.print_freq == 0:
+                #     print('Test: [{0}/{1}]\t'
+                #         'Acc@1 {top1:.3f} {task_il:.3f}\t'
+                #         'lr {lr:.5f}'.format(
+                #             idx, len(val_loader),top1=np.sum(corr)/np.sum(cnt)*100., task_il=correct_task/np.sum(cnt)*100., lr=current_lr
+                #         ))
+                print('Test: [{0}/{1}]\t'
+                    'Acc@1 {top1:.3f} {task_il:.3f}\t'
+                    'lr {lr:.5f}'.format(
+                        idx, len(val_loader),top1=np.sum(corr)/np.sum(cnt)*100., task_il=correct_task/np.sum(cnt)*100., lr=current_lr
+                    ))
+        print(' * Acc@1 {top1:.3f} {task_il:.3f}'.format(top1=np.sum(corr)/np.sum(cnt)*100., task_il=correct_task/np.sum(cnt)*100.))
+
+        # 学習率の調整
+        scheduler.step()
+
+    # 検証（これまで学習した各タスク毎に）
+    all_task_accuracies, all_task_losses = taskil_val_cclis(opt, model, classifier, criterion, taskil_loaders)
+    # all_task_knn_accuracies = knn_val_cclis(opt, model, taskil_loaders, knn_train_loaders)
+    # print("all_task_knn_accuracies: ", all_task_knn_accuracies)
+
+    classil_acc = np.sum(corr)/np.sum(cnt)*100.
+    taskil_acc = correct_task/np.sum(cnt)*100.
+
+
+    return classil_acc, taskil_acc, all_task_accuracies, classifier
+    # return classil_acc, taskil_acc, classifier

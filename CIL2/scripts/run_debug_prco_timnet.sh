@@ -33,7 +33,7 @@ export DISTILL_POWER=0.6
 
 # 線形分類関連のハイパラ
 export LINEAR_LEARNING_RATE=0.5
-export LINEAR_EPOCHS=100
+export LINEAR_EPOCHS=3
 export VAL_FREQ=1000
 
 

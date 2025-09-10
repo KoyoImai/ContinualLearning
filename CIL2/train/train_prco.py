@@ -730,7 +730,7 @@ def val_prco4timnet(opt, model, model2, linear_loader, val_loader, taskil_loader
         scheduler.step()
 
     # 検証（これまで学習した各タスク毎に）
-    # all_task_accuracies, all_task_losses = taskil_val_cclis(opt, model, classifier, criterion, taskil_loaders)
+    all_task_accuracies, all_task_losses = taskil_val_prco(opt, model, classifier, criterion, taskil_loaders)
     # all_task_knn_accuracies = knn_val_cclis(opt, model, taskil_loaders, knn_train_loaders)
     # print("all_task_knn_accuracies: ", all_task_knn_accuracies)
 
@@ -738,5 +738,5 @@ def val_prco4timnet(opt, model, model2, linear_loader, val_loader, taskil_loader
     taskil_acc = correct_task/np.sum(cnt)*100.
 
 
-    # return classil_acc, taskil_acc, all_task_accuracies, all_task_losses, classifier
-    return classil_acc, taskil_acc, classifier
+    return classil_acc, taskil_acc, all_task_accuracies, classifier
+    # return classil_acc, taskil_acc, classifier
