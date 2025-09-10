@@ -183,7 +183,7 @@ def train_prco(opt, model, model2, criterion, optimizer, train_loader, epoch):
 
                 # 蒸留損失を計算（KL-Divergence）
                 loss_distill = (-logits2 * torch.log(logits1)).sum(0).mean()
-                print("loss_distill: ", loss_distill)
+                # print("loss_distill: ", loss_distill)
                 write_csv(loss_distill.item(), opt.result_path, "distill_loss", opt.target_task, epoch)
                 loss += opt.distill_power * loss_distill
                 distill.update(loss_distill.item(), bsz)

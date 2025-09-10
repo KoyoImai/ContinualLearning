@@ -176,6 +176,15 @@ def make_setup(opt):
 
         model = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed, opt=opt)
 
+    elif opt.method in ["prco"]:
+
+        if opt.dataset in ["cifar10", "cifar100", "tiny-imagenet"]:
+            from models.resnet_cifar_prco import SupConResNet
+        elif opt.dataset in ["imagenet"]:
+            assert False
+
+        model = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed, opt=opt)
+
     else:
 
         assert False
@@ -189,32 +198,6 @@ def make_setup(opt):
 
     return model, None
     
-
-
-def make_scheduler(opt, epochs, dataloader, method_tools):
-
-    optimizer = method_tools["optimizer"]
-
-    if opt.method in ['er']:
-        scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=opt.milestone, gamma=0.1)
-
-    elif opt.method in ["co2l", "simclr"]:
-        print("len(dataloader): ", len(dataloader))
-        if opt.target_task == 0:
-            total_steps = opt.start_epoch * len(dataloader)
-            pct_start = (10 * len(dataloader)) / total_steps
-            scheduler = lr_scheduler.OneCycleLR(optimizer, max_lr=opt.learning_rate, total_steps=total_steps, pct_start=pct_start, anneal_strategy='cos')
-        else:
-            total_steps = opt.epochs * len(dataloader)
-            pct_start = (10 * len(dataloader)) / total_steps
-            scheduler = lr_scheduler.OneCycleLR(optimizer, max_lr=opt.learning_rate, total_steps=total_steps, pct_start=pct_start, anneal_strategy='cos')
-    
-    elif opt.method in ["cclis"]:
-        scheduler = None
-
-    return scheduler, method_tools
-
-
 
 
 def main():

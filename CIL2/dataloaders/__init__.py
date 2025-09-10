@@ -18,7 +18,7 @@ from dataloaders.dataloader_co2l import set_loader_co2l_tinyimagenet, set_linear
 from dataloaders.dataloader_cclis import set_loader_cclis_cifar10, set_loader_cclis_cifar100, set_loader_cclis_tinyimagenet
 
 # prco
-from dataloaders.dataloader_prco import set_loader_prco_cifar10
+from dataloaders.dataloader_prco import set_loader_prco_cifar10, set_loader_prco_cifar100, set_loader_prco_tinyimagenet
 
 
 
@@ -71,8 +71,10 @@ def set_loader(opt, model, replay_indices, method_tools):
             linear_loader = set_linearloader_co2l_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices)
         elif opt.dataset == 'tiny-imagenet':
             train_loader, subset_indices = set_loader_co2l_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices)
-            val_loader = set_valloader_co2l_tinyimagenet(opt=opt, normalize=normalize)
-            linear_loader = set_linearloader_co2l_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices)
+            # val_loader = set_valloader_co2l_tinyimagenet(opt=opt, normalize=normalize)
+            # linear_loader = set_linearloader_co2l_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices)
+            val_loader = None
+            linear_loader = None
 
 
     elif opt.method in ["cclis"]:
@@ -92,11 +94,14 @@ def set_loader(opt, model, replay_indices, method_tools):
             post_loader, _, _ = set_loader_cclis_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices, model=model, training=False)
             val_loader = set_valloader_co2l_cifar100(opt=opt, normalize=normalize)
             linear_loader = set_linearloader_co2l_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices)
+
         elif opt.dataset == 'tiny-imagenet':
             train_loader, subset_indices, subset_sample_num = set_loader_cclis_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices, model=model)
             post_loader, _, _ = set_loader_cclis_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices, method_tools=method_tools, training=False)
-            val_loader = set_valloader_co2l_tinyimagenet(opt=opt, normalize=normalize)
-            linear_loader = set_linearloader_co2l_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices)
+            # val_loader = set_valloader_co2l_tinyimagenet(opt=opt, normalize=normalize)
+            # linear_loader = set_linearloader_co2l_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices)
+            val_loader = None
+            linear_loader = None
         
         # method_tools["subset_sample_num"] = subset_sample_num
         # method_tools["post_loader"] = post_loader
@@ -106,13 +111,19 @@ def set_loader(opt, model, replay_indices, method_tools):
     elif opt.method in ["prco"]:
 
         if opt.dataset == "cifar10":
-            train_loader, subset_indices, subset_sample_num = set_loader_prco_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices, model=model)
+            train_loader, subset_indices, subset_sample_num = set_loader_prco_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices, model=model, training=True)
             val_loader = set_valloader_co2l_cifar10(opt=opt, normalize=normalize)
             linear_loader = set_linearloader_co2l_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices)
         elif opt.dataset == "cifar100":
-            assert False
+            train_loader, subset_indices, subset_sample_num = set_loader_prco_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices, model=model, training=True)
+            val_loader = set_valloader_co2l_cifar100(opt=opt, normalize=normalize)
+            linear_loader = set_linearloader_co2l_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices)
         elif opt.dataset == "tiny-imagenet":
-            assert False
+            train_loader, subset_indices, subset_sample_num = set_loader_prco_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices, model=model)
+            # val_loader = set_valloader_co2l_tinyimagenet(opt=opt, normalize=normalize)
+            # linear_loader = set_linearloader_co2l_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices)
+            val_loader = None
+            linear_loader = None
 
 
         
@@ -123,14 +134,15 @@ def set_loader(opt, model, replay_indices, method_tools):
     # データ拡張も特に加えていない現在タスクのデータローダ
     # （gpmのメモリ更新などで普通の画像が必要な手法用）
     if opt.dataset == "cifar10":
-        vanilla_loader, _ = set_vanillaloader_er_cifar10(opt=opt, normalize=normalize)
+        # vanilla_loader, _ = set_vanillaloader_er_cifar10(opt=opt, normalize=normalize)
         ncm_loader, _ = set_ncmloader_er_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices)
     elif opt.dataset == "cifar100":
-        vanilla_loader, _ = set_vanillaloader_er_cifar100(opt=opt, normalize=normalize)
+        # vanilla_loader, _ = set_vanillaloader_er_cifar100(opt=opt, normalize=normalize)
         ncm_loader, _ = set_ncmloader_er_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices)
     elif opt.dataset == "tiny-imagenet":
-        vanilla_loader, _ = set_vanillaloader_er_tinyimagenet(opt=opt, normalize=normalize)
-        ncm_loader, _ = set_ncmloader_er_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices)
+        # vanilla_loader, _ = set_vanillaloader_er_tinyimagenet(opt=opt, normalize=normalize)
+        # ncm_loader, _ = set_ncmloader_er_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices)
+        ncm_loader = None
     
 
     # タスク増加シナリオにおける評価を行うためのデータローダ
@@ -139,7 +151,8 @@ def set_loader(opt, model, replay_indices, method_tools):
     elif opt.dataset == "cifar100":
         taskil_loaders = set_taskil_valloader_er_cifar100(opt=opt, normalize=normalize)
     elif opt.dataset == "tiny-imagenet":
-        taskil_loaders = set_taskil_valloader_er_tinyimagenet(opt=opt, normalize=normalize)
+        # taskil_loaders = set_taskil_valloader_er_tinyimagenet(opt=opt, normalize=normalize)
+        taskil_loaders = None
 
 
     # タスク増加におけるknn分類を行うための訓練用データローダー
@@ -148,7 +161,8 @@ def set_loader(opt, model, replay_indices, method_tools):
     elif opt.dataset == "cifar100":
         knn_loaders = set_taskil_valloader_er_cifar100(opt=opt, normalize=normalize, train=True)
     elif opt.dataset == "tiny-imagenet":
-        knn_loaders = set_taskil_valloader_er_tinyimagenet(opt=opt, normalize=normalize, train=True)
+        # knn_loaders = set_taskil_valloader_er_tinyimagenet(opt=opt, normalize=normalize, train=True)
+        knn_loaders = None
 
 
 

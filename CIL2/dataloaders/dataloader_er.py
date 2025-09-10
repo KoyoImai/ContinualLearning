@@ -1051,7 +1051,10 @@ def set_ncmloader_er_tinyimagenet(opt, normalize, replay_indices):
         target_class_indices = np.where(_train_dataset.targets == tc)[0]
         subset_indices += np.where(_train_dataset.targets == tc)[0].tolist()
 
-    subset_indices += replay_indices
+    if isinstance(replay_indices, list):
+        subset_indices += replay_indices
+    elif isinstance(replay_indices, np.ndarray):
+        subset_indices += replay_indices.tolist()
 
     train_dataset =  Subset(_train_dataset, subset_indices)
     # print('Dataset size: {}'.format(len(subset_indices)))
