@@ -181,6 +181,12 @@ class SupConResNet(nn.Module):
         self.score = None
         self.score_mask = None
 
+        # EFM関連
+        self.efm = None
+        self.debug_loader = None   # デバッグ用
+        self.U = None
+        self.lam = None
+
         model_fun, dim_in = model_dict[name]
         self.encoder = model_fun()
         if head == 'linear':
@@ -216,7 +222,7 @@ class SupConResNet(nn.Module):
         
         if self.prototypes is not None:
             # return feat, self.prototypes(feat).T   #
-            return feat, self.prototypes(feat)       # DPを使用する場合，転置はエラーになるので外す 
+            return encoded, feat, self.prototypes(feat)       # DPを使用する場合，転置はエラーになるので外す 
 
         else:
             return feat

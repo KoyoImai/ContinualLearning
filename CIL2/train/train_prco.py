@@ -57,7 +57,15 @@ def warmup_learning_rate(args, epoch, batch_id, total_batches, optimizer):
 
 
 
+def calcurate_efm(opt):
 
+
+    return None
+
+
+# =========================
+# 訓練用関数部分
+# =========================
 def train_prco(opt, model, model2, criterion, optimizer, train_loader, epoch):
 
     # modelをtrainモードに変更
@@ -67,6 +75,11 @@ def train_prco(opt, model, model2, criterion, optimizer, train_loader, epoch):
     distill = AverageMeter()
 
     distill_type = opt.distill_type
+
+    # EFM を使用した蒸留損失
+    efm = model.module.efm
+    if torch.cuda.is_available() and (efm is not None):
+        efm = efm.cuda()
 
     for idx, data in enumerate(train_loader):
 
@@ -92,7 +105,7 @@ def train_prco(opt, model, model2, criterion, optimizer, train_loader, epoch):
         # warmup処理
         warmup_learning_rate(opt, epoch, idx, len(train_loader), optimizer)
         
-        features, output = model(images)
+        _, features, output = model(images)
         output = output.T
 
         device = (torch.device('cuda')
@@ -168,7 +181,7 @@ def train_prco(opt, model, model2, criterion, optimizer, train_loader, epoch):
                 # ==================================              
                 with torch.no_grad():
                     # 過去モデルで過去クラスに対応したプロトタイプの出力を計算
-                    _, sim2_prev_task = model2(images)
+                    _, _, sim2_prev_task = model2(images)
                     sim2_prev_task = sim2_prev_task.T
                     sim2_prev_task = torch.matmul(prototypes_mask, sim2_prev_task)
                     features2_sim = torch.div(sim2_prev_task, opt.past_temp)
@@ -188,12 +201,50 @@ def train_prco(opt, model, model2, criterion, optimizer, train_loader, epoch):
                 loss += opt.distill_power * loss_distill
                 distill.update(loss_distill.item(), bsz)
         
-        elif distill_type == "EFCD":            
-            assert False
-        
-        else:
-            assert False
+        # 特徴ドリフトの方向に重み付けして，学習済タスクに重要な方向へとドリフトすることを防ぐ
+        elif distill_type == "EFC":
+            if opt.target_task > 0:
 
+                # 過去モデルの出力を獲得
+                with torch.no_grad():
+                    encoded_pre, features_pre, output_pre = model2(images)
+                
+                D = features.shape[1]
+                
+                # Projector 出力の差分を計算
+                delta = features - features_pre
+
+                # lamda_{EMF} E_{t-1} + \eta I
+                M = opt.lambda_efm * efm + opt.eta_efm * torch.eye(D, device=features.device)
+
+                loss_reg = torch.einsum('bi,ij,bj->b', delta, M, delta).mean()
+                write_csv(loss_reg.item(), opt.result_path, "reg_loss", opt.target_task, epoch)
+                loss += opt.distill_power * loss_reg
+                distill.update(loss_reg.item(), bsz)
+                print("loss_reg: ", loss_reg)
+
+
+        elif distill_type == "ND":
+            if opt.target_task > 0:
+
+                # 過去モデルの出力を獲得
+                with torch.no_grad():
+                    encoded_pre, features_pre, output_pre = model2(images)
+                
+                D = features.shape[1]
+                
+                # Projector 出力の差分を計算
+                delta = features - features_pre
+
+                # L2蒸留損失
+                loss_distill = (delta ** 2).sum(dim=1).mean()
+
+                write_csv(loss_distill.item(), opt.result_path, "distill_loss", opt.target_task, epoch)
+                loss += opt.distill_power * loss_distill
+                distill.update(loss_distill.item(), bsz)
+                print("loss_distill: ", loss_distill)
+        
+        
         
         losses.update(loss.item(), bsz)
 
@@ -219,6 +270,9 @@ def train_prco(opt, model, model2, criterion, optimizer, train_loader, epoch):
 
 
 
+# =========================
+# 検証用関数部分
+# =========================
 def val_prco(opt, model, model2, linear_loader, val_loader, taskil_loaders, knn_train_loaders, epoch):
 
     # classifierの準備
@@ -414,7 +468,6 @@ def taskil_val_prco(opt, model, classifier,  criterion, val_loaders):
 
 
 
-
 def knn_eval(test_embeddings, test_labels, knn_train_embeddings, knn_train_labels, args):
     
     if args.dataset == 'cifar100':
@@ -600,18 +653,6 @@ def ncm_prco(model, ncm_loader, val_loader):
 
 
     return ncm_acc
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

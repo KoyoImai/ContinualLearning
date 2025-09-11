@@ -50,7 +50,7 @@ export VAL_FREQ=1000
 
 
 
-python ./main_linear4timnet.py --method ${METHOD} --mem_type ${MEM_TYPE} --dataset ${DATASET} --seed ${SEED} \
+python ./main_linear4timnet.py --method ${METHOD} --mem_type ${MEM_TYPE} --mem_size ${MEM_SIZE} --dataset ${DATASET} --seed ${SEED} \
                         --linear_learning_rate ${LINEAR_LEARNING_RATE} --linear_epochs ${LINEAR_EPOCHS} \
                         --epoch_save --log_name ${LOG_NAME}  --date ${DATE} --target_task 1 --target_epoch 1
 

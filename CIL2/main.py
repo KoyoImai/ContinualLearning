@@ -75,6 +75,8 @@ def parse_option():
 
     # prcoのハイパーパラメータ（一部のハイパラはCo2L・CCLISと共通）
     parser.add_argument('--temp_prco', type=float, default=0.5)
+    parser.add_argument('--lambda_efm', type=float, default=10.0)    # 論文値
+    parser.add_argument('--eta_efm', type=float, default=0.1)
     
 
     # その他の設定

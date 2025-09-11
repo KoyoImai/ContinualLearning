@@ -19,6 +19,7 @@ from dataloaders.dataloader_cclis import set_loader_cclis_cifar10, set_loader_cc
 
 # prco
 from dataloaders.dataloader_prco import set_loader_prco_cifar10, set_loader_prco_cifar100, set_loader_prco_tinyimagenet
+from dataloaders.dataloader_prco import set_loader_prco_debug_cifar10
 
 
 
@@ -114,6 +115,10 @@ def set_loader(opt, model, replay_indices, method_tools):
             train_loader, subset_indices, subset_sample_num = set_loader_prco_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices, model=model, training=True)
             val_loader = set_valloader_co2l_cifar10(opt=opt, normalize=normalize)
             linear_loader = set_linearloader_co2l_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices)
+
+            debug_loader = set_loader_prco_debug_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices, model=model, training=True)
+            model.debug_loader = debug_loader
+
         elif opt.dataset == "cifar100":
             train_loader, subset_indices, subset_sample_num = set_loader_prco_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices, model=model, training=True)
             val_loader = set_valloader_co2l_cifar100(opt=opt, normalize=normalize)

@@ -2,11 +2,15 @@
 
 
 from postprocesses.postprocess_cclis import postprocess_cclis
+from postprocesses.postprocess_prco import postprocess_prco
+
+
 
 def post_process(opt, model, model2, dataloader, criterion, method_tools, replay_indices):
 
     # # データローダーの分解
-    # train_loader = dataloader["train"]
+    train_loader = dataloader["train"]
+    # train_loader = model.debug_loader
     # val_loader = dataloader["val"]
     # linear_loader = dataloader["linear"]
     # vanilla_loader = dataloader["vanilla"]
@@ -20,6 +24,7 @@ def post_process(opt, model, model2, dataloader, criterion, method_tools, replay
         return 
 
     elif opt.method in ["prco"]:
+        postprocess_prco(opt=opt, model=model, train_loader=train_loader)
         return 
     
     else:

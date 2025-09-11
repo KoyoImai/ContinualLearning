@@ -181,6 +181,10 @@ class SupConResNet(nn.Module):
         self.score = None
         self.score_mask = None
 
+        # EFC関連
+        self.efm = None
+
+
         model_fun, dim_in = model_dict[name]
         self.encoder = model_fun()
         if head == 'linear':

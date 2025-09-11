@@ -169,6 +169,84 @@ def set_loader_prco_cifar10(opt, normalize, replay_indices, model, training=True
     return train_loader, subset_indices, replay_sample_num
 
 
+# ===================================================
+# EFM計算のデバッグ用にデータセットのサイズを落として作成
+# ===================================================
+def set_loader_prco_debug_cifar10(opt, normalize, replay_indices, model, training=True):
+
+    train_transform = transforms.Compose([
+        transforms.Resize(size=(opt.size, opt.size)),
+        transforms.RandomResizedCrop(size=opt.size, scale=(0.1 if opt.dataset=='tiny-imagenet' else 0.2, 1.)),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomApply([
+            transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
+        ], p=0.8),
+        transforms.RandomGrayscale(p=0.2),
+        transforms.RandomApply([transforms.GaussianBlur(kernel_size=opt.size//20*2+1, sigma=(0.1, 2.0))], p=0.5 if opt.size>32 else 0.0),
+        transforms.ToTensor(),
+        normalize,
+    ])
+
+    # タスク "opt.target_task" で学習に使用するクラスのリスト
+    target_classes = list(range(opt.target_task*opt.cls_per_task, (opt.target_task+1)*opt.cls_per_task))
+    print('target_classes', target_classes)
+
+    # データセットとして使用するサンプルのインデックスリスト
+    subset_indices = []
+
+    _train_dataset = datasets.CIFAR10(root=opt.data_folder,
+                                        transform=train_transform,
+                                        download=True)
+    
+    for tc in target_classes:
+        target_class_indices = np.where(np.array(_train_dataset.targets) == tc)[0]
+        subset_indices += np.where(np.array(_train_dataset.targets) == tc)[0].tolist()[:250]  # cur_sample index, list
+        # print("subset_indices: ", subset_indices)
+        # assert False
+        tc_num = (np.array(_train_dataset.targets) == tc).sum()
+    
+    _subset_indices = copy.deepcopy(subset_indices)
+
+
+    if len(replay_indices) > 0 and training:
+        prev_dataset = PRCO_Subset(_train_dataset, replay_indices)
+        cur_dataset = PRCO_Subset(_train_dataset, _subset_indices)
+        dataset_len_list = [len(prev_dataset), len(cur_dataset)]
+        train_dataset = ConcatDataset([prev_dataset, cur_dataset])
+
+    else:
+        _subset_indices += replay_indices
+        train_dataset = PRCO_Subset(_train_dataset, _subset_indices)
+
+    subset_indices += replay_indices
+    uk, uc = np.unique(np.array(_train_dataset.targets)[subset_indices], return_counts=True)  
+    print('uc[np.argsort(uk)]', uc[np.argsort(uk)])
+    replay_sample_num = uc[np.argsort(uk)]
+
+
+    if len(replay_indices) > 0 and training: 
+        train_batch_size_list = [int(np.round(opt.batch_size * dataset_len_list[0] / sum(dataset_len_list))), 
+                                 opt.batch_size - int(np.round(opt.batch_size * dataset_len_list[0] / sum(dataset_len_list)))]
+        
+        print('train_batch_size', train_batch_size_list)
+        train_sampler = BatchSchedulerSampler(dataset=train_dataset, batch_size=train_batch_size_list)
+        print('len_data', [len(cur_dataset) for cur_dataset in train_sampler.dataset.datasets])
+    else:
+        train_sampler = None
+        
+    if training:
+        train_loader = torch.utils.data.DataLoader(
+                            train_dataset, batch_size=250, shuffle=(train_sampler is None),
+                            num_workers=opt.num_workers, pin_memory=True, sampler=train_sampler)
+
+
+    else:
+        train_loader = torch.utils.data.DataLoader(
+                            train_dataset, batch_size=250, shuffle=False,
+                            num_workers=opt.num_workers, pin_memory=True)
+    
+
+    return train_loader, subset_indices, replay_sample_num
 
 
 
