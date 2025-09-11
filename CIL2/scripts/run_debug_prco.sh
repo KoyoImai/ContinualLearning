@@ -20,7 +20,7 @@ export BATCH_SIZE=512
 export LEARNING_RATE=1.0
 export LEARNING_RATE_PROTOTYPES=0.01
 
-export EPOCHS=50
+export EPOCHS=10
 export START_EPOCH=50
 
 
@@ -28,7 +28,7 @@ export START_EPOCH=50
 export TEMP_PRCO=0.5
 export CURRENT_TEMP=0.2
 export PAST_TEMP=0.1
-export DISTILL_TYPE="ND"    # PRD. EFC, ND
+export DISTILL_TYPE="EFC"    # PRD. EFC, ND
 export DISTILL_POWER=1.0
 
 

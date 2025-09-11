@@ -18,7 +18,7 @@ def postprocess_prco(opt, model, train_loader):
     model.eval()
 
 
-    for idx, (images, labels, index) in enumerate(train_loader):
+    for idx, (images, labels) in enumerate(train_loader):
     # for idx, data in enumerate(train_loader):
     #     images, labels = data
 

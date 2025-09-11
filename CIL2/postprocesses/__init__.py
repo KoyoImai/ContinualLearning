@@ -10,9 +10,9 @@ def post_process(opt, model, model2, dataloader, criterion, method_tools, replay
 
     # # データローダーの分解
     train_loader = dataloader["train"]
+    linear_loader = dataloader["linear"]
     # train_loader = model.debug_loader
     # val_loader = dataloader["val"]
-    # linear_loader = dataloader["linear"]
     # vanilla_loader = dataloader["vanilla"]
 
 
@@ -24,7 +24,8 @@ def post_process(opt, model, model2, dataloader, criterion, method_tools, replay
         return 
 
     elif opt.method in ["prco"]:
-        postprocess_prco(opt=opt, model=model, train_loader=train_loader)
+        if opt.distill_type == "EFC":
+            postprocess_prco(opt=opt, model=model, train_loader=linear_loader)
         return 
     
     else:
