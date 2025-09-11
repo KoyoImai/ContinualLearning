@@ -120,8 +120,8 @@ def postprocess_prco(opt, model, train_loader):
             # 例: E_local (B, 128, 128), E_batch (128, 128)
 
         # デバッグ用
-        if batch_count > 1:
-            break
+        # if batch_count > 1:
+        #     break
     
     print("batch_count: ", batch_count)
 
