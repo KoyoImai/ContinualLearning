@@ -246,10 +246,11 @@ def set_loader_eval4timnet(opt, model, replay_indices, method_tools):
         val_loader = set_valloader_co2l_tinyimagenet(opt=opt, normalize=normalize)
         linear_loader = set_linearloader_co2l_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices)
         taskil_loaders = set_taskil_valloader_er_tinyimagenet(opt=opt, normalize=normalize)
+        knn_loaders = set_taskil_valloader_er_tinyimagenet(opt=opt, normalize=normalize, train=True)
         # taskil_loaders = None
 
 
-    dataloaders = {"val": val_loader, "linear": linear_loader, "taskil": taskil_loaders}
+    dataloaders = {"val": val_loader, "linear": linear_loader, "taskil": taskil_loaders, "knn": knn_loaders}
 
     return dataloaders
 

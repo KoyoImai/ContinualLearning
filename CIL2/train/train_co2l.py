@@ -331,6 +331,8 @@ def knn_eval(test_embeddings, test_labels, knn_train_embeddings, knn_train_label
         n_neighbors = 101
     elif args.dataset == 'cifar10':
         n_neighbors = 101
+    elif args.dataset == "tiny-imagenet":
+        n_neighbors = 101
     else:
         assert False
     
@@ -514,7 +516,7 @@ def ncm_co2l(model, ncm_loader, val_loader):
 
 
 
-def val_co2l4timnet(opt, model, model2, linear_loader, val_loader, taskil_loaders, epoch):
+def val_co2l4timnet(opt, model, model2, linear_loader, val_loader, taskil_loaders, knn_train_loaders, epoch):
 
     # classifierの準備
     classifier = LinearClassifier(name="resnet18", num_classes=opt.n_cls, seed=opt.seed)
@@ -627,8 +629,8 @@ def val_co2l4timnet(opt, model, model2, linear_loader, val_loader, taskil_loader
 
     # 検証（これまで学習した各タスク毎に）
     all_task_accuracies, all_task_losses = taskil_val_co2l(opt, model, classifier, criterion, taskil_loaders)
-    # all_task_knn_accuracies = knn_val_cclis(opt, model, taskil_loaders, knn_train_loaders)
+    all_task_knn_accuracies = knn_val_cclis(opt, model, taskil_loaders, knn_train_loaders)
 
     classil_acc = np.sum(corr)/np.sum(cnt)*100.
     taskil_acc = correct_task/np.sum(cnt)*100.
-    return classil_acc, taskil_acc, all_task_accuracies, classifier
+    return classil_acc, taskil_acc, all_task_accuracies, all_task_knn_accuracies, classifier
