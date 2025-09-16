@@ -123,9 +123,9 @@ def set_loader(opt, model, replay_indices, method_tools):
         elif opt.dataset == "tiny-imagenet":
             train_loader, subset_indices, subset_sample_num = set_loader_prco_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices, model=model)
             # val_loader = set_valloader_co2l_tinyimagenet(opt=opt, normalize=normalize)
-            # linear_loader = set_linearloader_co2l_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices)
+            linear_loader = set_linearloader_co2l_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices)
             val_loader = None
-            linear_loader = None
+            # linear_loader = None
 
 
         
