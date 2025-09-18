@@ -303,9 +303,15 @@ def set_buffer(opt, model, prev_indices=None, method_tools=None):
         model.module.val_targets = val_targets
     
     elif opt.method in ["prco"]:
-        from dataloaders.buffer_er import set_replay_samples_ring
-        replay_indices = set_replay_samples_ring(opt, model, prev_indices=prev_indices) 
 
+        if opt.mem_type == "ring":
+            from dataloaders.buffer_er import set_replay_samples_ring
+            replay_indices = set_replay_samples_ring(opt, model, prev_indices=prev_indices) 
+        elif opt.mem_type == "kmeans":
+            from dataloaders.buffer_er import set_replay_samples_kmeans
+            replay_indices = set_replay_samples_kmeans(opt, model, prev_indices=prev_indices) 
+        else:
+            assert False
 
     
     return replay_indices, method_tools
