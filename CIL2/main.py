@@ -58,6 +58,8 @@ def parse_option():
     parser.add_argument('--mem_size', type=int, default=500)
     parser.add_argument('--offline', action='store_true', help='offline learning')
 
+    parser.add_argument('--feat_dim', type=int, default=128)
+
     # co2lのハイパーパラメータ
     parser.add_argument('--temp_co2l', type=float, default=0.5)
     parser.add_argument('--current_temp', type=float, default=0.2)
@@ -173,8 +175,8 @@ def make_setup(opt):
         elif opt.dataset in ["imagemet"]:
             assert False
         
-        model = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed)
-        model2 = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed)
+        model = SupConResNet(name='resnet18', head='mlp', feat_dim=opt.feat_dim, seed=opt.seed)
+        model2 = SupConResNet(name='resnet18', head='mlp', feat_dim=opt.feat_dim, seed=opt.seed)
         criterion = SupConLoss(temperature=opt.temp_co2l, not_asym=opt.not_asym)
 
         optimizer = optim.SGD(model.parameters(),
@@ -195,8 +197,8 @@ def make_setup(opt):
             assert False
         
 
-        model = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed, opt=opt)
-        model2 = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed, opt=opt)
+        model = SupConResNet(name='resnet18', head='mlp', feat_dim=opt.feat_dim, seed=opt.seed, opt=opt)
+        model2 = SupConResNet(name='resnet18', head='mlp', feat_dim=opt.feat_dim, seed=opt.seed, opt=opt)
         criterion = ISSupConLoss(temperature=opt.temp_cclis, opt=opt)
 
 
@@ -226,8 +228,8 @@ def make_setup(opt):
         elif opt.dataset in ["imagenet"]:
             assert False
 
-        model = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed, opt=opt)
-        model2 = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed, opt=opt)
+        model = SupConResNet(name='resnet18', head='mlp', feat_dim=opt.feat_dim, seed=opt.seed, opt=opt)
+        model2 = SupConResNet(name='resnet18', head='mlp', feat_dim=opt.feat_dim, seed=opt.seed, opt=opt)
         criterion = ProtoSupConLoss(temperature=opt.temp_prco, opt=opt)
 
         if 'prototypes.weight' in model.state_dict().keys():

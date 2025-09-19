@@ -45,6 +45,8 @@ def parse_option():
     # parser.add_argument('--momentum', type=float, default=0.9)
     # parser.add_argument('--weight_decay', type=float, default=1e-4)
 
+    parser.add_argument('--feat_dim', type=int, default=128)
+
 
     # 線形分類層の最適化設定
     parser.add_argument('--linear_batch_size', type=int, default=128)
@@ -164,7 +166,7 @@ def make_setup(opt):
         elif opt.dataset in ["imagemet"]:
             assert False
         
-        model = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed)
+        model = SupConResNet(name='resnet18', head='mlp', feat_dim=opt.feat_dim, seed=opt.seed)
 
 
     elif opt.method in ["cclis"]:
@@ -174,7 +176,7 @@ def make_setup(opt):
         elif opt.dataset in ["imagemet"]:
             assert False
 
-        model = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed, opt=opt)
+        model = SupConResNet(name='resnet18', head='mlp', feat_dim=opt.feat_dim, seed=opt.seed, opt=opt)
 
     elif opt.method in ["prco"]:
 
@@ -183,7 +185,7 @@ def make_setup(opt):
         elif opt.dataset in ["imagenet"]:
             assert False
 
-        model = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed, opt=opt)
+        model = SupConResNet(name='resnet18', head='mlp', feat_dim=opt.feat_dim, seed=opt.seed, opt=opt)
 
     else:
 
