@@ -49,7 +49,7 @@ def parse_option():
 
 
     # 線形分類層の最適化設定
-    parser.add_argument('--linear_batch_size', type=int, default=128)
+    parser.add_argument('--linear_batch_size', type=int, default=256)
     parser.add_argument('--linear_learning_rate', type=float, default=1.0)
     parser.add_argument('--linear_epochs', type=int, default=10)
     parser.add_argument('--linear_momentum', type=float, default=0.9)

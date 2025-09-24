@@ -6,6 +6,7 @@ from util import save_classifier, write_csv
 from train.train_co2l import train_co2l, val_co2l, ncm_co2l, val_co2l4timnet
 from train.train_cclis import train_cclis, val_cclis, ncm_cclis, adjust_learning_rate_cclis, val_cclis4timnet
 from train.train_prco import train_prco, adjust_learning_rate_prco
+from train.train_prco_scheduler import train_prco_scheduler
 
 
 logger = logging.getLogger(__name__)
@@ -90,6 +91,15 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
 
         loss, model2 = train_prco(opt=opt, model=model, model2=model2, criterion=criterion,
                                   optimizer=optimizer, train_loader=train_loader, epoch=epoch)
+    
+
+    elif opt.method == "prco-scheduler":
+
+        adjust_learning_rate_cclis(opt, optimizer, epoch)
+
+
+
+
 
     
     else:

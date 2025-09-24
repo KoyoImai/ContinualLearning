@@ -21,8 +21,7 @@ from sklearn.neighbors import KNeighborsClassifier
 logger = logging.getLogger(__name__)
 
 
-
-def adjust_learning_rate_cclis(args, optimizer, epoch):
+def adjust_learning_rate_prco(args, optimizer, epoch):
     lr_enc = args.learning_rate
     lr_prot = args.learning_rate_prototypes
     if args.cosine:
@@ -42,6 +41,7 @@ def adjust_learning_rate_cclis(args, optimizer, epoch):
 
     for idx, param_group in enumerate(optimizer.param_groups):
         param_group['lr'] = lr_list[idx]
+        
 
 
 def warmup_learning_rate(args, epoch, batch_id, total_batches, optimizer):
@@ -57,7 +57,16 @@ def warmup_learning_rate(args, epoch, batch_id, total_batches, optimizer):
 
 
 
-def train_cclis(opt, model, model2, criterion, optimizer, train_loader, epoch, subset_sample_num, score_mask):
+def calcurate_efm(opt):
+
+
+    return None
+
+
+# =========================
+# 訓練用関数部分
+# =========================
+def train_prco_scheduler(opt, model, model2, criterion, optimizer, train_loader, epoch):
 
     # modelをtrainモードに変更
     model.train()
@@ -65,15 +74,17 @@ def train_cclis(opt, model, model2, criterion, optimizer, train_loader, epoch, s
     losses = AverageMeter()
     distill = AverageMeter()
 
-    criterion_ce = torch.nn.CrossEntropyLoss()
-
-
     distill_type = opt.distill_type
 
+    # EFM を使用した蒸留損失
+    efm = model.module.efm
+    if torch.cuda.is_available() and (efm is not None):
+        efm = efm.cuda()
+
     for idx, data in enumerate(train_loader):
-        
+
         # 画像などの取得
-        images, labels, importance_weight, index = data
+        images, labels, index = data
 
         # バッチサイズ
         bsz = labels.shape[0]
@@ -83,8 +94,6 @@ def train_cclis(opt, model, model2, criterion, optimizer, train_loader, epoch, s
             labels = labels.cuda(non_blocking=True)
         
 
-        # print("images.shape: ", images.shape)
-
         # normalize the prototypes
         with torch.no_grad():
             prev_task_mask = labels < opt.target_task * opt.cls_per_task
@@ -92,25 +101,12 @@ def train_cclis(opt, model, model2, criterion, optimizer, train_loader, epoch, s
             w = model.module.prototypes.weight.data.clone()
             w = nn.functional.normalize(w, dim=1, p=2)
             model.module.prototypes.weight.copy_(w)
-        
-        # print("model: ", model)
-        # assert False
 
-        # warm-up learning rate
+        # warmup処理
         warmup_learning_rate(opt, epoch, idx, len(train_loader), optimizer)
-
-
-        # ===========================================================================
-        # ラベルありデータの順伝搬
-        # ===========================================================================
         
-        features, output = model(images)
+        _, features, output = model(images)
         output = output.T
-        # print("features.shape: ", features.shape)   # features.shape:  torch.Size([512, 128])
-        # print("output.shape: ", output.shape)       # output.shape:  torch.Size([400, 128])
-
-        # assert False
-
 
         device = (torch.device('cuda')
                   if features.is_cuda
@@ -118,106 +114,122 @@ def train_cclis(opt, model, model2, criterion, optimizer, train_loader, epoch, s
 
         # 現在タスクのクラス
         target_labels = list(range(opt.target_task*opt.cls_per_task, (opt.target_task+1)*opt.cls_per_task))
-        # print("target_labels : ", target_labels)
+        # print("target_labels: ", target_labels)
 
 
-        # ISSupCon
-        loss = criterion(output,
-                         features, 
-                         labels, 
-                         importance_weight, 
-                         index, 
-                         target_labels=target_labels, 
-                         sample_num=subset_sample_num, 
-                         score_mask=score_mask,
-                         reduction='mean',
-                         )
+        # ===========================================================================
+        # 新しい知識獲得のための損失計算
+        # ===========================================================================
+        # プロトタイプベースの対照損失
+        loss = criterion(output, features, labels, index, target_labels)
         write_csv(loss.item(), opt.result_path, "issupcon_loss", opt.target_task, epoch)
 
-        if distill_type == 'IRD':
+
+        # ===========================================================================
+        # 過去の知識を保持するための蒸留損失
+        # ===========================================================================
+        if distill_type == "PRD":
+
             if opt.target_task > 0:
-                # IRD (cur)
-                labels_mask = labels < min(target_labels)
 
-                features1_prev_task = features[labels_mask] if IRD_type == 'prev' else features
-
-
-                features1_sim = torch.div(torch.matmul(features1_prev_task, features1_prev_task.T), opt.current_temp)
-                logits_mask = torch.scatter(
-                    torch.ones_like(features1_sim),
-                    1,
-                    torch.arange(features1_sim.size(0)).view(-1, 1).cuda(non_blocking=True),
-                    0
-                )
-                logits_max1, _ = torch.max(features1_sim * logits_mask, dim=1, keepdim=True)
-                features1_sim = features1_sim - logits_max1.detach()
-                row_size = features1_sim.size(0)
-                logits1 = torch.exp(features1_sim[logits_mask.bool()].view(row_size, -1)) / torch.exp(features1_sim[logits_mask.bool()].view(row_size, -1)).sum(dim=1, keepdim=True)
-
-                # IRD (past)
-                with torch.no_grad():
-                    features2, _ = model2(images)
-                    features2_prev_task = features2[labels_mask] if IRD_type == 'prev' else features2
-
-                    features2_sim = torch.div(torch.matmul(features2_prev_task, features2_prev_task.T), opt.past_temp)
-                    logits_max2, _ = torch.max(features2_sim*logits_mask, dim=1, keepdim=True)
-                    features2_sim = features2_sim - logits_max2.detach()
-                    logits2 = torch.exp(features2_sim[logits_mask.bool()].view(row_size, -1)) /  torch.exp(features2_sim[logits_mask.bool()].view(row_size, -1)).sum(dim=1, keepdim=True)
-
-                loss_distill = (-logits2 * torch.log(logits1)).sum(1).mean()
-                loss += opt.distill_power * loss_distill
-                distill.update(loss_distill.item(), bsz)
-        
-        elif distill_type == 'PRD':
-            if opt.target_task > 0:
+                # バッチに含まれるラベル一覧
                 all_labels = torch.unique(labels).view(-1, 1)
+                # print("all_labels.shape: ", all_labels.shape)    # all_labels.shape:  torch.Size([4, 1])
 
+                # 過去タスクのラベル一覧
                 prev_all_labels = torch.arange(target_labels[0])
+                # print("prev_all_labels.shape: ", prev_all_labels.shape)   # prev_all_labels.shape:  torch.Size([2])
                 
+                # プロトタイプマスクを作成
+                # （過去タスクのクラスに対応した出力のみを抽出可能）
                 prototypes_mask = torch.scatter(
                     torch.zeros(len(prev_all_labels), opt.n_cls).float(),
                     1,
                     prev_all_labels.view(-1,1),
                     1
-                    ).to(device)
+                ).to(device)
+                # print("prototypes_mask.shape: ", prototypes_mask.shape)   # prototypes_mask.shape:  torch.Size([2, 10])
+                # print("prototypes_mask: ", prototypes_mask)
+                # prototypes_mask:  tensor([[1., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+                #         [0., 1., 0., 0., 0., 0., 0., 0., 0., 0.]], device='cuda:0')
 
+                # 過去タスクのサンプルだけを選別するマスク
                 labels_mask = labels < min(target_labels)
+                # print("labels_mask.shape: ", labels_mask.shape)     # labels_mask.shape:  torch.Size([512])
 
-                # PRD (cur)
-                sim_prev_task = torch.matmul(prototypes_mask, output)
+                
+                # ==================================
+                # PRD (現在モデルの出力)
+                # ==================================
+                # 現在モデルで過去クラスに対応したプロトタイプの出力を計算
+                sim_prev_task = torch.matmul(prototypes_mask, output)              # output から 過去クラスに対応した出力のみ取り出す
+                features1_sim = torch.div(sim_prev_task, opt.current_temp)         # 温度パラメータで除算
 
-                features1_sim = torch.div(sim_prev_task, opt.current_temp)
-                 
-
+                # 数値安定化
                 logits_max1, _ = torch.max(features1_sim, dim=0, keepdim=True)
                 features1_sim = features1_sim - logits_max1.detach()  # number stability
+
                 row_size = features1_sim.size(0)
-                
+                # print("row_size: ", row_size)      # row_size:  2
+
+                # logits を計算
                 logits1 = torch.exp(features1_sim) / torch.exp(features1_sim).sum(dim=0, keepdim=True)
 
-                # PRD (past)
+
+                # ==================================
+                # PRD (過去モデルの出力)
+                # ==================================              
                 with torch.no_grad():
-                    _, sim2_prev_task = model2(images)
+                    # 過去モデルで過去クラスに対応したプロトタイプの出力を計算
+                    _, _, sim2_prev_task = model2(images)
                     sim2_prev_task = sim2_prev_task.T
                     sim2_prev_task = torch.matmul(prototypes_mask, sim2_prev_task)
-
                     features2_sim = torch.div(sim2_prev_task, opt.past_temp)
+
+                    # 数値安定化
                     logits_max2, _ = torch.max(features2_sim, dim=0, keepdim=True)
                     features2_sim = features2_sim - logits_max2.detach()
-                    logits2 = torch.exp(features2_sim) /  torch.exp(features2_sim).sum(dim=0, keepdim=True)
 
+                    # logits を計算
+                    logits2 = torch.exp(features2_sim) / torch.exp(features2_sim).sum(dim=0, keepdim=True)
+                
+
+                # 蒸留損失を計算（KL-Divergence）
                 loss_distill = (-logits2 * torch.log(logits1)).sum(0).mean()
+                # print("loss_distill: ", loss_distill)
                 write_csv(loss_distill.item(), opt.result_path, "distill_loss", opt.target_task, epoch)
                 loss += opt.distill_power * loss_distill
                 distill.update(loss_distill.item(), bsz)
-            
-        elif distill_type == 'ND':
-
+        
+        # 特徴ドリフトの方向に重み付けして，学習済タスクに重要な方向へとドリフトすることを防ぐ
+        elif distill_type == "EFC":
             if opt.target_task > 0:
 
                 # 過去モデルの出力を獲得
                 with torch.no_grad():
-                    features_pre, output_pre = model2(images)
+                    encoded_pre, features_pre, output_pre = model2(images)
+                
+                D = features.shape[1]
+                
+                # Projector 出力の差分を計算
+                delta = features - features_pre
+
+                # lamda_{EMF} E_{t-1} + \eta I
+                M = opt.lambda_efm * efm + opt.eta_efm * torch.eye(D, device=features.device)
+
+                loss_reg = torch.einsum('bi,ij,bj->b', delta, M, delta).mean()
+                write_csv(loss_reg.item(), opt.result_path, "reg_loss", opt.target_task, epoch)
+                loss += opt.distill_power * loss_reg
+                distill.update(loss_reg.item(), bsz)
+                print("loss_reg: ", loss_reg)
+
+
+        elif distill_type == "ND":
+            if opt.target_task > 0:
+
+                # 過去モデルの出力を獲得
+                with torch.no_grad():
+                    encoded_pre, features_pre, output_pre = model2(images)
                 
                 D = features.shape[1]
                 
@@ -231,27 +243,18 @@ def train_cclis(opt, model, model2, criterion, optimizer, train_loader, epoch, s
                 loss += opt.distill_power * loss_distill
                 distill.update(loss_distill.item(), bsz)
                 print("loss_distill: ", loss_distill)
-
-
-        else:
-            raise ValueError("distill type {} is not supported".format(distill_type))
-
-
-        # update metric
+        
+        
+        
         losses.update(loss.item(), bsz)
 
         # 現在の学習率
         current_lr = optimizer.param_groups[0]['lr']
 
-        # for i, param_group in enumerate(optimizer.param_groups):
-        #         print(f"Param group {i} learning rate: {param_group['lr']}")
-        # print("scheduler.get_last_lr(): ", scheduler.get_last_lr())
-
         # SGD
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        # scheduler.step()
 
         # 学習記録の表示
         if (idx+1) % opt.print_freq == 0 or idx+1 == len(train_loader):
@@ -267,7 +270,10 @@ def train_cclis(opt, model, model2, criterion, optimizer, train_loader, epoch, s
 
 
 
-def val_cclis(opt, model, model2, linear_loader, val_loader, taskil_loaders, knn_train_loaders, epoch):
+# =========================
+# 検証用関数部分
+# =========================
+def val_prco(opt, model, model2, linear_loader, val_loader, taskil_loaders, knn_train_loaders, epoch):
 
     # classifierの準備
     classifier = LinearClassifier(name="resnet18", num_classes=opt.n_cls, seed=opt.seed)
@@ -382,8 +388,8 @@ def val_cclis(opt, model, model2, linear_loader, val_loader, taskil_loaders, knn
         scheduler.step()
 
     # 検証（これまで学習した各タスク毎に）
-    all_task_accuracies, all_task_losses = taskil_val_cclis(opt, model, classifier, criterion, taskil_loaders)
-    all_task_knn_accuracies = knn_val_cclis(opt, model, taskil_loaders, knn_train_loaders)
+    all_task_accuracies, all_task_losses = taskil_val_prco(opt, model, classifier, criterion, taskil_loaders)
+    all_task_knn_accuracies = knn_val_prco(opt, model, taskil_loaders, knn_train_loaders)
     print("all_task_knn_accuracies: ", all_task_knn_accuracies)
 
     classil_acc = np.sum(corr)/np.sum(cnt)*100.
@@ -392,8 +398,7 @@ def val_cclis(opt, model, model2, linear_loader, val_loader, taskil_loaders, knn
 
 
 
-
-def taskil_val_cclis(opt, model, classifier,  criterion, val_loaders):
+def taskil_val_prco(opt, model, classifier,  criterion, val_loaders):
 
     # modelをevalモードに変更
     model.eval()
@@ -463,15 +468,12 @@ def taskil_val_cclis(opt, model, classifier,  criterion, val_loaders):
 
 
 
-
 def knn_eval(test_embeddings, test_labels, knn_train_embeddings, knn_train_labels, args):
     
     if args.dataset == 'cifar100':
         n_neighbors = 101
     elif args.dataset == 'cifar10':
-        n_neighbors = 101
-    elif args.dataset == 'tiny-imagenet':
-        n_neighbors = 101
+        n_neighbors = 501
     else:
         assert False
     
@@ -495,7 +497,7 @@ def knn_eval(test_embeddings, test_labels, knn_train_embeddings, knn_train_label
 
 
 
-def knn_val_cclis(opt, model, val_loaders, train_loaders):
+def knn_val_prco(opt, model, val_loaders, train_loaders):
 
      # modelをevalモードに変更
     model.eval()
@@ -561,7 +563,7 @@ def knn_val_cclis(opt, model, val_loaders, train_loaders):
 
 
 
-def ncm_cclis(model, ncm_loader, val_loader):
+def ncm_prco(model, ncm_loader, val_loader):
 
     # modelを評価モードに変更
     model.eval()
@@ -654,10 +656,7 @@ def ncm_cclis(model, ncm_loader, val_loader):
 
 
 
-
-
-
-def val_cclis4timnet(opt, model, model2, linear_loader, val_loader, taskil_loaders, knn_train_loaders, epoch):
+def val_prco4timnet(opt, model, model2, linear_loader, val_loader, taskil_loaders, epoch):
 
     # classifierの準備
     classifier = LinearClassifier(name="resnet18", num_classes=opt.n_cls, seed=opt.seed)
@@ -772,13 +771,13 @@ def val_cclis4timnet(opt, model, model2, linear_loader, val_loader, taskil_loade
         scheduler.step()
 
     # 検証（これまで学習した各タスク毎に）
-    all_task_accuracies, all_task_losses = taskil_val_cclis(opt, model, classifier, criterion, taskil_loaders)
-    all_task_knn_accuracies = knn_val_cclis(opt, model, taskil_loaders, knn_train_loaders)
+    all_task_accuracies, all_task_losses = taskil_val_prco(opt, model, classifier, criterion, taskil_loaders)
+    # all_task_knn_accuracies = knn_val_cclis(opt, model, taskil_loaders, knn_train_loaders)
     # print("all_task_knn_accuracies: ", all_task_knn_accuracies)
 
     classil_acc = np.sum(corr)/np.sum(cnt)*100.
     taskil_acc = correct_task/np.sum(cnt)*100.
 
 
-    return classil_acc, taskil_acc, all_task_accuracies, all_task_knn_accuracies, classifier
+    return classil_acc, taskil_acc, all_task_accuracies, classifier
     # return classil_acc, taskil_acc, classifier

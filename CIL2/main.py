@@ -29,7 +29,7 @@ def parse_option():
 
     # 基本的な実験設定
     parser.add_argument("--log_name", type=str, default="test")
-    parser.add_argument('--method', type=str, default='cclis', choices=['er', 'co2l', 'cclis', 'prco'])
+    parser.add_argument('--method', type=str, default='cclis', choices=['er', 'co2l', 'cclis', 'prco', 'prco-scheduler'])
 
     # データセット関連
     parser.add_argument('--data_folder', type=str, default='/home/kouyou/Datasets/', help='path to custom dataset')
@@ -219,7 +219,7 @@ def make_setup(opt):
                             weight_decay=opt.weight_decay)
         method_tools = {"optimizer": optimizer}
 
-    elif opt.method in ["prco"]:
+    elif opt.method in ["prco", "prco-scheduler"]:
 
         from losses.loss_prco import ProtoSupConLoss
 
@@ -288,7 +288,7 @@ def make_scheduler(opt, epochs, dataloader, method_tools):
     elif opt.method in ["cclis"]:
         scheduler = None
 
-    elif opt.method in ["prco"]:
+    elif opt.method in ["prco", "prco-scheduler"]:
         scheduler = None
     
     else:
@@ -395,7 +395,6 @@ def main():
                 save_model(model, method_tools["optimizer"], opt, opt.epochs, file_path)
             
 
-        
         # タスク終了後の後処理（gpmなどの後処理が必要な手法のため）
         post_process(opt=opt, model=model, model2=model2, dataloader=dataloader, criterion=criterion, method_tools=method_tools, replay_indices=replay_indices)
 

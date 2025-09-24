@@ -109,7 +109,7 @@ def set_loader(opt, model, replay_indices, method_tools):
         model.module.subset_sample_num = subset_sample_num
         model.module.post_loader = post_loader
     
-    elif opt.method in ["prco"]:
+    elif opt.method in ["prco", "prco-scheduler"]:
 
         if opt.dataset == "cifar10":
             train_loader, subset_indices, subset_sample_num = set_loader_prco_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices, model=model, training=True)
@@ -302,7 +302,7 @@ def set_buffer(opt, model, prev_indices=None, method_tools=None):
         model.module.importance_weight = importance_weight
         model.module.val_targets = val_targets
     
-    elif opt.method in ["prco"]:
+    elif opt.method in ["prco", "prco-scheduler"]:
 
         if opt.mem_type == "ring":
             from dataloaders.buffer_er import set_replay_samples_ring
