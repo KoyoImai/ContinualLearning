@@ -17,8 +17,8 @@ export DATE="2025_0907"
 # 学習のハイパラ関連
 export BATCH_SIZE=512
 export LEARNING_RATE=0.5
-export EPOCHS=100
-export START_EPOCH=500
+export EPOCHS=15
+export START_EPOCH=15
 
 
 # Co2L特有設定
@@ -43,9 +43,14 @@ export VAL_FREQ=1000
 #                  --epoch_save 
 
 
-python ./main_linear.py --method ${METHOD} --mem_type ${MEM_TYPE} --mem_size ${MEM_SIZE} --dataset ${DATASET} --seed ${SEED} --log_name ${LOG_NAME} --date ${DATE} \
-                        --linear_learning_rate ${LINEAR_LEARNING_RATE} --linear_epochs ${LINEAR_EPOCHS} \
-                        --target_task 0 --target_epoch 1
+# python ./main_linear.py --method ${METHOD} --mem_type ${MEM_TYPE} --mem_size ${MEM_SIZE} --dataset ${DATASET} --seed ${SEED} --log_name ${LOG_NAME} --date ${DATE} \
+#                         --linear_learning_rate ${LINEAR_LEARNING_RATE} --linear_epochs ${LINEAR_EPOCHS} \
+#                         --target_task 0 --target_epoch 1
 
+
+
+python ./main_ncm.py --method ${METHOD} --mem_type ${MEM_TYPE} --mem_size ${MEM_SIZE} --dataset ${DATASET} --seed ${SEED} --log_name ${LOG_NAME} --date ${DATE} \
+                        --linear_learning_rate ${LINEAR_LEARNING_RATE} --linear_epochs ${LINEAR_EPOCHS} \
+                        --target_task 0 --target_epoch 14
 
 

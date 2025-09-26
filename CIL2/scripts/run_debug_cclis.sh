@@ -11,15 +11,15 @@ export MEM_TYPE="ring"
 export MEM_SIZE=500
 export DATASET="cifar10"
 export SEED=0
-export LOG_NAME="cclis-v3"
-export DATE="2025_0907"
+export LOG_NAME="test"
+export DATE="2025_0926"
 
 # 学習のハイパラ関連
 export BATCH_SIZE=512
 export LEARNING_RATE=1.0
 export LEARNING_RATE_PROTOTYPES=0.01
 
-export EPOCHS=100
+export EPOCHS=10
 export START_EPOCH=10
 
 
@@ -40,12 +40,12 @@ export VAL_FREQ=1000
 
 
 
-python main.py --method ${METHOD} --mem_type ${MEM_TYPE} --mem_size ${MEM_SIZE} --dataset ${DATASET} --seed ${SEED} --log_name ${LOG_NAME} --date ${DATE} \
-                --batch_size ${BATCH_SIZE} --learning_rate ${LEARNING_RATE} --learning_rate_prototypes ${LEARNING_RATE_PROTOTYPES} \
-                --epochs ${EPOCHS} --start_epoch ${START_EPOCH} \
-                --temp_cclis ${TEMP_CCLIS} --current_temp ${CURRENT_TEMP} --past_temp ${PAST_TEMP} --distill_type ${DISTILL_TYPE} --distill_power ${DISTILL_POWER} \
-                --linear_learning_rate ${LINEAR_LEARNING_RATE} --linear_epochs ${LINEAR_EPOCHS} --val_freq ${VAL_FREQ} \
-                --epoch_save --cosine 
+# python main.py --method ${METHOD} --mem_type ${MEM_TYPE} --mem_size ${MEM_SIZE} --dataset ${DATASET} --seed ${SEED} --log_name ${LOG_NAME} --date ${DATE} \
+#                 --batch_size ${BATCH_SIZE} --learning_rate ${LEARNING_RATE} --learning_rate_prototypes ${LEARNING_RATE_PROTOTYPES} \
+#                 --epochs ${EPOCHS} --start_epoch ${START_EPOCH} \
+#                 --temp_cclis ${TEMP_CCLIS} --current_temp ${CURRENT_TEMP} --past_temp ${PAST_TEMP} --distill_type ${DISTILL_TYPE} --distill_power ${DISTILL_POWER} \
+#                 --linear_learning_rate ${LINEAR_LEARNING_RATE} --linear_epochs ${LINEAR_EPOCHS} --val_freq ${VAL_FREQ} \
+#                 --epoch_save --cosine 
 
 
 
@@ -55,6 +55,12 @@ python main.py --method ${METHOD} --mem_type ${MEM_TYPE} --mem_size ${MEM_SIZE} 
 #                         --learning_rate ${LEARNING_RATE} --learning_rate_prototypes ${LEARNING_RATE_PROTOTYPES} \
 #                         --linear_learning_rate ${LINEAR_LEARNING_RATE} --linear_epochs ${LINEAR_EPOCHS} \
 #                         --epoch_save --log_name ${LOG_NAME}  --date ${DATE} --target_task 1 --target_epoch 1
+
+
+
+python main_ncm.py --method ${METHOD} --mem_type ${MEM_TYPE} --mem_size ${MEM_SIZE} --dataset ${DATASET} --seed ${SEED} --log_name ${LOG_NAME} --date ${DATE} \
+                --linear_learning_rate ${LINEAR_LEARNING_RATE} --linear_epochs ${LINEAR_EPOCHS} \
+                --target_task 1 --target_epoch 9
 
 
 # python main.py --method cclis --cosine --start_epoch 1 --epochs 1 --val_freq 1 --linear_epochs 3 --log_name test --date 0906

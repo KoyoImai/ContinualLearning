@@ -11,8 +11,8 @@ export MEM_TYPE="kmeans"
 export MEM_SIZE=500
 export DATASET="cifar10"
 export SEED=0
-export LOG_NAME="test-kmeans"
-export DATE="2025_0918"
+export LOG_NAME="test"
+export DATE="2025_0926"
 
 
 # 学習のハイパラ関連
@@ -20,8 +20,8 @@ export BATCH_SIZE=512
 export LEARNING_RATE=1.0
 export LEARNING_RATE_PROTOTYPES=0.01
 
-export EPOCHS=2
-export START_EPOCH=2
+export EPOCHS=10
+export START_EPOCH=10
 
 
 # PRCO特有の設定
@@ -50,6 +50,11 @@ python main.py --method ${METHOD} --mem_type ${MEM_TYPE} --mem_size ${MEM_SIZE} 
                 --temp_prco ${TEMP_PRCO} --current_temp ${CURRENT_TEMP} --past_temp ${PAST_TEMP} --distill_type ${DISTILL_TYPE} --distill_power ${DISTILL_POWER} \
                 --linear_learning_rate ${LINEAR_LEARNING_RATE} --linear_epochs ${LINEAR_EPOCHS} --val_freq ${VAL_FREQ} \
                 --epoch_save --cosine 
+
+
+python main_ncm.py --method ${METHOD} --mem_type ${MEM_TYPE} --mem_size ${MEM_SIZE} --dataset ${DATASET} --seed ${SEED} --log_name ${LOG_NAME} --date ${DATE} \
+                --linear_learning_rate ${LINEAR_LEARNING_RATE} --linear_epochs ${LINEAR_EPOCHS} \
+                --target_task 1 --target_epoch 9
 
 
 

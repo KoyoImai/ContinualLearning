@@ -225,6 +225,66 @@ def set_loader_eval(opt, model, replay_indices, method_tools):
     return dataloaders
 
 
+
+
+
+
+# ====================================================
+# Nearest Class Mean分類用データローダーメインの作成
+# ====================================================
+def set_loader_ncm(opt, model, replay_indices, method_tools):
+
+    if opt.dataset == 'cifar10':
+        mean = (0.4914, 0.4822, 0.4465)
+        std = (0.2023, 0.1994, 0.2010)
+    elif opt.dataset == 'cifar100':       # scaleから
+        # mean = (0.5071, 0.4867, 0.4408)
+        # std = (0.2675, 0.2565, 0.2761)
+        mean=[x/255 for x in [125.3,123.0,113.9]]
+        std=[x/255 for x in [63.0,62.1,66.7]]
+    elif opt.dataset == 'tiny-imagenet':
+        mean = (0.4802, 0.4480, 0.3975)
+        std = (0.2770, 0.2691, 0.2821)
+    elif opt.dataset == 'path':
+        mean = eval(opt.mean)
+        std = eval(opt.mean)
+    else:
+        raise ValueError('dataset not supported: {}'.format(opt.dataset))
+
+
+    normalize = transforms.Normalize(mean=mean, std=std)
+
+
+
+    if opt.dataset == "cifar10":
+        val_loader = set_valloader_co2l_cifar10(opt=opt, normalize=normalize)
+        linear_loader = set_linearloader_co2l_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices)
+        ncm_loader, _ = set_ncmloader_er_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices)
+    elif opt.dataset == "cifar100":
+        val_loader = set_valloader_co2l_cifar100(opt=opt, normalize=normalize)
+        linear_loader = set_linearloader_co2l_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices)
+        ncm_loader, _ = set_ncmloader_er_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices)
+    elif opt.dataset == 'tiny-imagenet':
+        val_loader = set_valloader_co2l_tinyimagenet(opt=opt, normalize=normalize)
+        linear_loader = set_linearloader_co2l_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices)
+        ncm_loader, _ = set_ncmloader_er_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices)
+    
+
+    dataloaders = {"val": val_loader, "linear": linear_loader, "ncm": ncm_loader}
+
+
+    return dataloaders
+
+
+
+
+
+
+
+
+
+
+
 # ====================================================
 # tiny-imagenet専用，検証用データローダーメインの作成
 # ====================================================
@@ -253,6 +313,7 @@ def set_loader_eval4timnet(opt, model, replay_indices, method_tools):
     dataloaders = {"val": val_loader, "linear": linear_loader, "taskil": taskil_loaders, "knn": knn_loaders}
 
     return dataloaders
+
 
 
 

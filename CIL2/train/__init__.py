@@ -153,6 +153,44 @@ def eval(model, dataloader, opt):
 
 
 
+def eval_ncm(model, dataloader, opt):
+
+    # データローダーの分解
+    val_loader = dataloader["val"]
+    linear_loader = dataloader["linear"]
+    ncm_loader = dataloader["ncm"]
+
+    if opt.method == "er":
+
+        assert False
+    
+    elif opt.method == "co2l":
+
+        acc_euclidean, acc_cosine = ncm_co2l(opt=opt, model=model, ncm_loader=ncm_loader, val_loader=val_loader)
+        write_csv(acc_euclidean, opt.result_path, "ncm_euclidean_acc", opt.target_task, opt.target_epoch)
+        write_csv(acc_cosine, opt.result_path, "ncm_cosine_acc", opt.target_task, opt.target_epoch)
+    
+    elif opt.method == "cclis":
+        
+        acc_euclidean, acc_cosine = ncm_cclis(opt=opt, model=model, ncm_loader=ncm_loader, val_loader=val_loader)
+        write_csv(acc_euclidean, opt.result_path, "ncm_euclidean_acc", opt.target_task, opt.target_epoch)
+        write_csv(acc_cosine, opt.result_path, "ncm_cosine_acc", opt.target_task, opt.target_epoch)
+
+    elif opt.method == "prco":
+
+        acc_euclidean, acc_cosine = ncm_cclis(opt=opt, model=model, ncm_loader=ncm_loader, val_loader=val_loader)
+        write_csv(acc_euclidean, opt.result_path, "ncm_euclidean_acc", opt.target_task, opt.target_epoch)
+        write_csv(acc_cosine, opt.result_path, "ncm_cosine_acc", opt.target_task, opt.target_epoch)
+
+
+
+
+    else:
+
+        assert False
+
+
+
 def eval4timnet(model, dataloader, opt):
 
     # データローダーの分解

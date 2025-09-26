@@ -6,6 +6,7 @@ import math
 import logging
 import numpy as np
 from tqdm import tqdm
+from collections import defaultdict
 
 import torch
 import torch.optim as optim
@@ -13,6 +14,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim.lr_scheduler as lr_scheduler
 
+from train.utils import ncm_classify
 from util import AverageMeter, write_csv
 from models.resnet_cifar_co2l import LinearClassifier
 
@@ -561,16 +563,20 @@ def knn_val_cclis(opt, model, val_loaders, train_loaders):
 
 
 
-def ncm_cclis(model, ncm_loader, val_loader):
 
-    # modelを評価モードに変更
+
+def ncm_cclis(opt, model, ncm_loader, val_loader):
+
+    # modelをevalモードに変更
     model.eval()
 
-    # 訓練用（ncm_loader）データから全サンプルの特徴とラベルを集めるリスト
-    all_features = []
-    all_labels = []
+    # train_features = defaultdict(list)
+    train_encoded = defaultdict(list)
 
-    # 平均特徴の計算
+
+    # ==========================================================
+    # 訓練用データから平均特徴を計算
+    # ==========================================================
     with torch.no_grad():
         for idx, (images, labels) in enumerate(ncm_loader):
 
@@ -579,78 +585,160 @@ def ncm_cclis(model, ncm_loader, val_loader):
                 images = images.cuda(non_blocking=True)
                 labels = labels.cuda(non_blocking=True)
             
-            # modelにデータを入力
-            # y_pred, features = model(x=images, return_feat=True)
-            features = model.module.encoder(images)
+            # 特徴量を取り出す
+            # features, encoded = model(images, return_feat=True)
+            encoded = model.module.encoder(images)
 
-            # 特徴量とラベルを保存
-            all_features.append(features.cpu())
-            all_labels.append(labels.cpu())
-            
-    
-    # リスト内のテンソルを連結
-    all_features = torch.cat(all_features, dim=0)  # shape: [N, feature_dim]
-    all_labels = torch.cat(all_labels, dim=0)
-
-    unique_labels = torch.unique(all_labels)
-    class_means = {}  # {クラスラベル: 平均特徴}
-    
-    
-    # 保存してある特徴とラベルをもとに各クラスの平均を計算
-    for label in unique_labels:
-        
-        # 該当クラスのサンプルインデックスを抽出
-        idxs = (all_labels == label)
-        feats = all_features[idxs]
-        
-        # サンプルごとに特徴を平均
-        mean_feat = feats.mean(dim=0, keepdim=True)  # shape: [1, feature_dim]
-        class_means[int(label.item())] = mean_feat
+            # features と encoded を格納する
+            for enc, lbl in zip(encoded, labels):
+                train_encoded[int(lbl.item())].append(enc.detach().cpu())
     
 
-    # 辞書のキー（ラベル）が昇順になるようにソートし，平均特徴量を一つのテンソルに変換
-    sorted_labels = sorted(class_means.keys())
-    means_list = [class_means[l] for l in sorted_labels]
-    class_means_tensor = torch.cat(means_list, dim=0)  # shape: [num_classes, feature_dim]
-    print("Computed class means for {} classes.".format(class_means_tensor.shape[0]))
+    # ==========================================================
+    # 各クラスの平均特徴を計算
+    # ==========================================================
+    class_mean_encoded = {}
 
+    for cls in train_encoded.keys():
+        # torch.stack で [N, feature_dim] にまとめ、meanで平均を計算
+        class_mean_encoded[cls] = torch.mean(torch.stack(train_encoded[cls]), dim=0)
     
-    # 検証用データの特徴と各クラスの平均特徴を比較し，最も近いクラスに分類する
-    total = 0
-    correct = 0
+
+
+    # ==========================================================
+    # 検証用データの特徴量を取り出す
+    # ==========================================================
+    val_encoded = []
+    val_labels = []
+
     with torch.no_grad():
         for idx, (images, labels) in enumerate(val_loader):
-            
+
             # gpu上に配置
             if torch.cuda.is_available():
                 images = images.cuda(non_blocking=True)
                 labels = labels.cuda(non_blocking=True)
             
-            # モデルに検証データを入力して特徴を取得
-            # y_pred, features = model(x=images, return_feat=True)
-            features = model.module.encoder(images)
+            # 特徴量を取り出す
+            encoded = model.module.encoder(images)
 
-            # バッチ内の各サンプル特徴を正規化
-            features_norm = F.normalize(features, p=2, dim=1)
-
-            # クラス平均も同様に正規化（デバイス変換も行う）
-            class_means_norm = F.normalize(class_means_tensor.to(features.device), p=2, dim=1)
-
-            # 各サンプルと全クラス平均間のコサイン類似度を計算（内積）
-            # shape: [batch_size, num_classes]
-            cos_sim = torch.mm(features_norm, class_means_norm.t())
-
-            # 各サンプルについて、最も類似度が高いクラス（＝予測ラベル）を求める
-            pred_labels = cos_sim.argmax(dim=1)
-            
-            total += labels.size(0)
-            correct += (pred_labels == labels).sum().item()
+            # CPUに戻してリストに追加
+            val_encoded.append(encoded.detach().cpu())
+            val_labels.append(labels.detach().cpu())
     
-    ncm_acc = correct / total * 100
-    # print("NCM Classification Accuracy: {:.2f}%".format(ncm_acc))
+    # 各バッチを結合して1つのテンソルにまとめる
+    val_encoded = torch.cat(val_encoded, dim=0)     # shape: [num_val_samples, encoded_dim]
+    val_labels = torch.cat(val_labels, dim=0)       # shape: [num_val_samples]
+
+    print("=== 検証データ ===")
+    print("val_encoded.shape:", val_encoded.shape)
+    print("val_labels.shape:", val_labels.shape)
 
 
-    return ncm_acc
+    pred_labels_euclidean, acc_euclidean = ncm_classify(val_encoded, val_labels, class_mean_encoded, metric="euclidean")
+    pred_labels_cosine, acc_cosine = ncm_classify(val_encoded, val_labels, class_mean_encoded, metric="cosine")
+    print("acc_euclidean: ", acc_euclidean)
+    print("acc_cosine: ", acc_cosine)
+
+    return acc_euclidean, acc_cosine
+
+    
+
+
+
+
+
+
+# def ncm_cclis(model, ncm_loader, val_loader):
+
+#     # modelを評価モードに変更
+#     model.eval()
+
+#     # 訓練用（ncm_loader）データから全サンプルの特徴とラベルを集めるリスト
+#     all_features = []
+#     all_labels = []
+
+#     # 平均特徴の計算
+#     with torch.no_grad():
+#         for idx, (images, labels) in enumerate(ncm_loader):
+
+#             # gpu上に配置
+#             if torch.cuda.is_available():
+#                 images = images.cuda(non_blocking=True)
+#                 labels = labels.cuda(non_blocking=True)
+            
+#             # modelにデータを入力
+#             # y_pred, features = model(x=images, return_feat=True)
+#             features = model.module.encoder(images)
+
+#             # 特徴量とラベルを保存
+#             all_features.append(features.cpu())
+#             all_labels.append(labels.cpu())
+            
+    
+#     # リスト内のテンソルを連結
+#     all_features = torch.cat(all_features, dim=0)  # shape: [N, feature_dim]
+#     all_labels = torch.cat(all_labels, dim=0)
+
+#     unique_labels = torch.unique(all_labels)
+#     class_means = {}  # {クラスラベル: 平均特徴}
+    
+    
+#     # 保存してある特徴とラベルをもとに各クラスの平均を計算
+#     for label in unique_labels:
+        
+#         # 該当クラスのサンプルインデックスを抽出
+#         idxs = (all_labels == label)
+#         feats = all_features[idxs]
+        
+#         # サンプルごとに特徴を平均
+#         mean_feat = feats.mean(dim=0, keepdim=True)  # shape: [1, feature_dim]
+#         class_means[int(label.item())] = mean_feat
+    
+
+#     # 辞書のキー（ラベル）が昇順になるようにソートし，平均特徴量を一つのテンソルに変換
+#     sorted_labels = sorted(class_means.keys())
+#     means_list = [class_means[l] for l in sorted_labels]
+#     class_means_tensor = torch.cat(means_list, dim=0)  # shape: [num_classes, feature_dim]
+#     print("Computed class means for {} classes.".format(class_means_tensor.shape[0]))
+
+    
+#     # 検証用データの特徴と各クラスの平均特徴を比較し，最も近いクラスに分類する
+#     total = 0
+#     correct = 0
+#     with torch.no_grad():
+#         for idx, (images, labels) in enumerate(val_loader):
+            
+#             # gpu上に配置
+#             if torch.cuda.is_available():
+#                 images = images.cuda(non_blocking=True)
+#                 labels = labels.cuda(non_blocking=True)
+            
+#             # モデルに検証データを入力して特徴を取得
+#             # y_pred, features = model(x=images, return_feat=True)
+#             features = model.module.encoder(images)
+
+#             # バッチ内の各サンプル特徴を正規化
+#             features_norm = F.normalize(features, p=2, dim=1)
+
+#             # クラス平均も同様に正規化（デバイス変換も行う）
+#             class_means_norm = F.normalize(class_means_tensor.to(features.device), p=2, dim=1)
+
+#             # 各サンプルと全クラス平均間のコサイン類似度を計算（内積）
+#             # shape: [batch_size, num_classes]
+#             cos_sim = torch.mm(features_norm, class_means_norm.t())
+
+#             # 各サンプルについて、最も類似度が高いクラス（＝予測ラベル）を求める
+#             pred_labels = cos_sim.argmax(dim=1)
+            
+#             total += labels.size(0)
+#             correct += (pred_labels == labels).sum().item()
+    
+#     ncm_acc = correct / total * 100
+#     # print("NCM Classification Accuracy: {:.2f}%".format(ncm_acc))
+
+
+#     return ncm_acc
 
 
 
