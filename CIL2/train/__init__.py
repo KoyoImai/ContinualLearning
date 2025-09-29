@@ -231,3 +231,5 @@ def eval4timnet(model, dataloader, opt):
         write_csv(taskil_acc, opt.result_path, "taskil_acc", opt.target_task, opt.target_epoch)
         write_csv(all_task_accuracies, opt.result_path, "all_task_acc", opt.target_task, opt.target_epoch)
         write_csv(all_task_knn_accuracies, opt.result_path, "all_task_knn_acc", opt.target_task, opt.target_epoch)
+
+        

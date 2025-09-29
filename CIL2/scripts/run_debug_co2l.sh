@@ -9,7 +9,7 @@ export CUDA_VISIBLE_DEVICES="0"
 export METHOD="co2l"
 export MEM_TYPE="ring"
 export MEM_SIZE=500
-export DATASET="cifar100"
+export DATASET="tiny-imagenet"
 export SEED=0
 export LOG_NAME="test2"
 export DATE="2025_0907"
@@ -36,11 +36,11 @@ export VAL_FREQ=1000
 
 
 
-# python ./main.py --method ${METHOD} --mem_type ${MEM_TYPE} --mem_size ${MEM_SIZE} --dataset ${DATASET} --seed ${SEED} --log_name ${LOG_NAME} --date ${DATE} \
-#                  --batch_size ${BATCH_SIZE} --learning_rate ${LEARNING_RATE} --epochs ${EPOCHS} --start_epoch ${START_EPOCH} \
-#                  --temp_co2l ${TEMP_CO2L} --current_temp ${CURRENT_TEMP} --past_temp ${PAST_TEMP} --distill_power ${DISTILL_POWER} \
-#                  --linear_learning_rate ${LINEAR_LEARNING_RATE} --linear_epochs ${LINEAR_EPOCHS} --val_freq ${VAL_FREQ} \
-#                  --epoch_save 
+python ./main.py --method ${METHOD} --mem_type ${MEM_TYPE} --mem_size ${MEM_SIZE} --dataset ${DATASET} --seed ${SEED} --log_name ${LOG_NAME} --date ${DATE} \
+                 --batch_size ${BATCH_SIZE} --learning_rate ${LEARNING_RATE} --epochs ${EPOCHS} --start_epoch ${START_EPOCH} \
+                 --temp_co2l ${TEMP_CO2L} --current_temp ${CURRENT_TEMP} --past_temp ${PAST_TEMP} --distill_power ${DISTILL_POWER} \
+                 --linear_learning_rate ${LINEAR_LEARNING_RATE} --linear_epochs ${LINEAR_EPOCHS} --val_freq ${VAL_FREQ} \
+                 --epoch_save 
 
 
 # python ./main_linear.py --method ${METHOD} --mem_type ${MEM_TYPE} --mem_size ${MEM_SIZE} --dataset ${DATASET} --seed ${SEED} --log_name ${LOG_NAME} --date ${DATE} \

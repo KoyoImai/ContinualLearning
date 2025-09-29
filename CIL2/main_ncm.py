@@ -24,11 +24,6 @@ from util import seed_everything, save_model
 
 
 
-
-
-
-
-
 def parse_option():
     
     parser = argparse.ArgumentParser('argument for training')
@@ -254,7 +249,6 @@ def main():
     dataloader = set_loader_ncm(opt, model, replay_indices, method_tools)
 
     eval_ncm(model=model, dataloader=dataloader, opt=opt)
-
 
 
 
