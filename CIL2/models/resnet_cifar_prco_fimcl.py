@@ -217,7 +217,7 @@ class SupConResNet(nn.Module):
                 layers.reset_parameters()
 
 
-    def forward(self, x, norm=True):
+    def forward(self, x, norm=True, cal_fim=False):
         
         encoded = self.encoder(x)
         feat = self.head(encoded)
@@ -225,7 +225,7 @@ class SupConResNet(nn.Module):
 
         # 簡単化
         if norm:
-            if self.P_non is not None:
+            if (self.P_non is not None) and (not cal_fim):
 
                 # 非重要方向に射影してから正規化
                 feat_non = feat @ self.P_non   # (N, D)
