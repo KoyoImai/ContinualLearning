@@ -220,18 +220,41 @@ class SupConResNet(nn.Module):
     def forward(self, x, norm=True):
         
         encoded = self.encoder(x)
-        
-        if norm:
-            feat = F.normalize(self.head(encoded), dim=1)
-        else:
-            feat = self.head(encoded)
-        
-        if self.prototypes is not None:
-            # return feat, self.prototypes(feat).T   #
-            return encoded, feat, self.prototypes(feat)       # DPを使用する場合，転置はエラーになるので外す 
+        feat = self.head(encoded)
 
+
+        # 簡単化
+        if norm:
+            if self.P_non is not None:
+
+                # 非重要方向に射影してから正規化
+                feat_non = feat @ self.P_non   # (N, D)
+                # print("feat.shape: ", feat.shape)     # feat.shape:  torch.Size([512, 128])
+
+                feat_non = F.normalize(feat_non, dim=1)
+                # print("feat.shape: ", feat.shape)     # feat.shape:  torch.Size([512, 128]
+
+                feat = F.normalize(feat, dim=1)
+
+            else:
+                feat_non = None
+                feat = F.normalize(feat, dim=1)
+        
+
+        # if self.P_non is not None:
+        #     print("feat.shape: ", feat.shape)               # feat.shape:  torch.Size([512, 128])
+        #     print("self.P_non.shape: ", self.P_non.shape)   # self.P_non.shape:  torch.Size([128, 128])
+
+
+        if self.prototypes is not None:
+            
+            if feat_non is not None:
+                # return feat, self.prototypes(feat).T   #
+                return encoded, feat, feat_non, self.prototypes(feat_non)       # DPを使用する場合，転置はエラーになるので外す 
+            else:
+                return encoded, feat, feat_non, self.prototypes(feat)       # DPを使用する場合，転置はエラーになるので外す 
         else:
-            return feat
+            return feat, feat_non
     
 
     def choose_k_from_eigvals(self, lam, threshold=0.97):

@@ -20,8 +20,8 @@ export BATCH_SIZE=512
 export LEARNING_RATE=1.0
 export LEARNING_RATE_PROTOTYPES=0.01
 
-export EPOCHS=2
-export START_EPOCH=2
+export EPOCHS=100
+export START_EPOCH=100
 
 
 # PRCO特有の設定

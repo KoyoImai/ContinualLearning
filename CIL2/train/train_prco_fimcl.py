@@ -105,7 +105,7 @@ def train_prco_fimcl(opt, model, model2, criterion, optimizer, train_loader, epo
         # warmup処理
         warmup_learning_rate(opt, epoch, idx, len(train_loader), optimizer)
         
-        _, features, output = model(images)
+        _, features, features_non, output = model(images)
         output = output.T
 
         device = (torch.device('cuda')
@@ -182,7 +182,7 @@ def train_prco_fimcl(opt, model, model2, criterion, optimizer, train_loader, epo
                 # ==================================              
                 with torch.no_grad():
                     # 過去モデルで過去クラスに対応したプロトタイプの出力を計算
-                    _, _, sim2_prev_task = model2(images)
+                    _, _, _, sim2_prev_task = model2(images)
                     sim2_prev_task = sim2_prev_task.T
                     sim2_prev_task = torch.matmul(prototypes_mask, sim2_prev_task)
                     features2_sim = torch.div(sim2_prev_task, opt.past_temp)
@@ -206,9 +206,15 @@ def train_prco_fimcl(opt, model, model2, criterion, optimizer, train_loader, epo
         elif distill_type == "EFC":
             if opt.target_task > 0:
 
+                # print("model.module.efm: ", model.module.efm)
+                # print("model.module.P_non: ", model.module.P_non)
+
+                # print("model2.module.efm: ", model2.module.efm)
+                # print("model2.module.P_non: ", model2.module.P_non)
+
                 # 過去モデルの出力を獲得
                 with torch.no_grad():
-                    encoded_pre, features_pre, output_pre = model2(images)
+                    encoded_pre, features_pre, features_non_pre, output_pre = model2(images)
                 
                 D = features.shape[1]
                 

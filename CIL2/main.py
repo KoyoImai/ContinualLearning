@@ -255,7 +255,7 @@ def make_setup(opt):
         from losses.loss_prco_fimcl import ProtoSupConLoss
 
         if opt.dataset in ["cifar10", "cifar100", "tiny-imagenet"]:
-            from models.resnet_cifar_prco import SupConResNet
+            from models.resnet_cifar_prco_fimcl import SupConResNet
         elif opt.dataset in ["imagenet"]:
             assert False
 
