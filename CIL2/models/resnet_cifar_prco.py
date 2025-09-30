@@ -181,11 +181,17 @@ class SupConResNet(nn.Module):
         self.score = None
         self.score_mask = None
 
-        # EFM関連
-        self.efm = None
+        
+        # EFM関連のパラメータ
         self.debug_loader = None   # デバッグ用
+        self.efm = None
         self.U = None
         self.lam = None
+        self.U_imp = None
+        self.U_non = None
+        self.P_imp = None
+        self.P_non = None
+
 
         model_fun, dim_in = model_dict[name]
         self.encoder = model_fun()
@@ -214,18 +220,114 @@ class SupConResNet(nn.Module):
     def forward(self, x, norm=True):
         
         encoded = self.encoder(x)
-        
+        feat = self.head(encoded)
+
+        # 数式に限りなく正直に従って実装したバージョン        
+        # if norm:
+        #     if self.P_non is not None:
+        #         feat = F.normalize(self.P_non @ self.head(encoded).T, dim=0).T   # 非重要方向に射影
+        #         # print("feat.shape: ", feat.shape)    # feat.shape:  torch.Size([512, 128])
+        #         # assert False
+        #     else:
+        #         feat = F.normalize(self.head(encoded), dim=1)
+        # else:
+        #     feat = self.head(encoded)
+
+
+        # 簡単化
         if norm:
-            feat = F.normalize(self.head(encoded), dim=1)
-        else:
-            feat = self.head(encoded)
+            if self.P_non is not None:
+                # 非重要方向に射影してから正規化
+                # print("self.P_non == torch.t(self.P_non): ", self.P_non == torch.t(self.P_non))
+                # print("self.P_non[0][0:5]: ", self.P_non[0][0:5])
+                # print("self.P_non[1][0:5]: ", self.P_non[1][0:5])
+                # print("self.P_non[2][0:5]: ", self.P_non[2][0:5])
+                feat = feat @ self.P_non   # (N, D)
+                # print("feat.shape: ", feat.shape)     # feat.shape:  torch.Size([512, 128])
+                feat = F.normalize(feat, dim=1)
+                # print("feat.shape: ", feat.shape)     # feat.shape:  torch.Size([512, 128]
+            else:
+                feat = F.normalize(feat, dim=1)
         
+
+        # if self.P_non is not None:
+        #     print("feat.shape: ", feat.shape)               # feat.shape:  torch.Size([512, 128])
+        #     print("self.P_non.shape: ", self.P_non.shape)   # self.P_non.shape:  torch.Size([128, 128])
+
+
         if self.prototypes is not None:
+            
             # return feat, self.prototypes(feat).T   #
             return encoded, feat, self.prototypes(feat)       # DPを使用する場合，転置はエラーになるので外す 
 
         else:
             return feat
+    
+
+    def choose_k_from_eigvals(self, lam, threshold=0.97):
+        """
+        固有値スペクトルから重要方向の本数 k を決める関数
+
+        Args:
+            lam : torch.Tensor, shape (D,)
+                固有値（降順ソート済みを想定）
+            threshold : float
+                累積寄与率のしきい値 (0 < threshold <= 1)
+
+        Returns:
+            k : int
+                重要方向の本数
+        """
+
+        # 総和
+        total = lam.sum()
+        
+        # 累積寄与率
+        cum_ratio = torch.cumsum(lam, dim=0) / total
+        
+        # threshold を超える最小のインデックスを選ぶ
+        k = int((cum_ratio >= threshold).nonzero(as_tuple=True)[0][0].item() + 1)
+        
+        return k
+
+
+
+    def update_efm(self, opt):
+
+        self.efm = self.efm
+        self.U = self.U
+        self.lam = self.lam
+
+        # print("self.efm.shape: ", self.efm.shape)   # self.efm.shape:  torch.Size([128, 128])
+        # print("self.U.shape: ", self.U.shape)       # self.U.shape:  torch.Size([128, 128])
+        # print("self.lam.shape: ", self.lam.shape)   # self.lam.shape:  torch.Size([128])
+
+        # 重要方向と非重要方向の分離
+        # 重要方向と非重要方向の閾値は，上位固有値の支配率によって決定
+        k = self.choose_k_from_eigvals(lam=self.lam, threshold=0.97)
+        print(f"選ばれた重要方向の本数 k = {k}")
+
+        # -------------------------
+        # 重要方向と非重要方向の分離
+        # -------------------------
+        self.U_imp = self.U[:, :k]     # 重要方向基底 (D, k)
+        self.U_non = self.U[:, k:]     # 非重要方向基底 (D, D-k)
+
+        # （オプション）射影行列も保存しておくと便利
+        D = self.U.shape[0]
+        I = torch.eye(D, device=self.U.device)
+        self.P_imp = self.U_imp @ self.U_imp.t()   # 重要方向への射影行列
+        self.P_non = I - self.P_imp                # 非重要方向への射影行列
+
+        if torch.cuda.is_available():
+            self.P_imp = self.P_imp.cuda()
+            self.P_non = self.P_non.cuda()
+
+        print(f"U_imp shape: {self.U_imp.shape}, U_non shape: {self.U_non.shape}")
+        print("self.P_imp: ", self.P_imp.shape, "self.P_non: ", self.P_non.shape)
+
+        return 
+    
 
 
 class SupCEResNet(nn.Module):

@@ -6,7 +6,7 @@ export CUDA_VISIBLE_DEVICES="3"
 
 
 # 基本設定（log_name関連）
-export METHOD="prco-scheduler"
+export METHOD="prco-fimcl"
 export MEM_TYPE="kmeans"
 export MEM_SIZE=500
 export DATASET="cifar10"
@@ -28,7 +28,7 @@ export START_EPOCH=2
 export TEMP_PRCO=0.5
 export CURRENT_TEMP=0.2
 export PAST_TEMP=0.1
-export DISTILL_TYPE="ND"    # PRD. EFC, ND
+export DISTILL_TYPE="EFC"    # PRD. EFC, ND
 export DISTILL_POWER=1.0
 
 

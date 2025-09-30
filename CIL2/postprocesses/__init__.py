@@ -27,6 +27,13 @@ def post_process(opt, model, model2, dataloader, criterion, method_tools, replay
         if opt.distill_type == "EFC":
             postprocess_prco(opt=opt, model=model, train_loader=linear_loader)
         return 
+
+    elif opt.method in ["prco-fimcl"]:
+        if opt.distill_type == "EFC":
+            postprocess_prco(opt=opt, model=model, train_loader=linear_loader)
+            model.module.update_efm(opt=opt)
+        return 
+
     
     else:
         assert False

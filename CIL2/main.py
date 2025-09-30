@@ -29,7 +29,7 @@ def parse_option():
 
     # 基本的な実験設定
     parser.add_argument("--log_name", type=str, default="test")
-    parser.add_argument('--method', type=str, default='cclis', choices=['er', 'co2l', 'cclis', 'prco', 'prco-scheduler'])
+    parser.add_argument('--method', type=str, default='cclis', choices=['er', 'co2l', 'cclis', 'prco', 'prco-fimcl'])
 
     # データセット関連
     parser.add_argument('--data_folder', type=str, default='/home/kouyou/Datasets/', help='path to custom dataset')
@@ -219,9 +219,40 @@ def make_setup(opt):
                             weight_decay=opt.weight_decay)
         method_tools = {"optimizer": optimizer}
 
-    elif opt.method in ["prco", "prco-scheduler"]:
+    elif opt.method in ["prco"]:
 
         from losses.loss_prco import ProtoSupConLoss
+
+        if opt.dataset in ["cifar10", "cifar100", "tiny-imagenet"]:
+            from models.resnet_cifar_prco import SupConResNet
+        elif opt.dataset in ["imagenet"]:
+            assert False
+
+        model = SupConResNet(name='resnet18', head='mlp', feat_dim=opt.feat_dim, seed=opt.seed, opt=opt)
+        model2 = SupConResNet(name='resnet18', head='mlp', feat_dim=opt.feat_dim, seed=opt.seed, opt=opt)
+        criterion = ProtoSupConLoss(temperature=opt.temp_prco, opt=opt)
+
+        if 'prototypes.weight' in model.state_dict().keys():
+            optimizer = optim.SGD([
+                            {'params': model.encoder.parameters()},
+                            {'params': model.head.parameters()},
+                            {'params': model.prototypes.parameters(), 'lr': opt.learning_rate_prototypes},
+                            ],
+                            lr=opt.learning_rate,
+                            momentum=opt.momentum,
+                            weight_decay=opt.weight_decay)
+        else:
+            learning_rate =  opt.learning_rate
+            optimizer = optim.SGD(model.parameters(),
+                            lr=learning_rate,
+                            momentum=opt.momentum,
+                            weight_decay=opt.weight_decay)
+        method_tools = {"optimizer": optimizer}
+    
+
+    elif opt.method in ["prco-fimcl"]:
+
+        from losses.loss_prco_fimcl import ProtoSupConLoss
 
         if opt.dataset in ["cifar10", "cifar100", "tiny-imagenet"]:
             from models.resnet_cifar_prco import SupConResNet
@@ -288,7 +319,7 @@ def make_scheduler(opt, epochs, dataloader, method_tools):
     elif opt.method in ["cclis"]:
         scheduler = None
 
-    elif opt.method in ["prco", "prco-scheduler"]:
+    elif opt.method in ["prco", "prco-fimcl"]:
         scheduler = None
     
     else:

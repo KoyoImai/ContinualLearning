@@ -66,7 +66,7 @@ def calcurate_efm(opt):
 # =========================
 # 訓練用関数部分
 # =========================
-def train_prco_scheduler(opt, model, model2, criterion, optimizer, train_loader, epoch):
+def train_prco_fimcl(opt, model, model2, criterion, optimizer, train_loader, epoch):
 
     # modelをtrainモードに変更
     model.train()
@@ -121,6 +121,7 @@ def train_prco_scheduler(opt, model, model2, criterion, optimizer, train_loader,
         # 新しい知識獲得のための損失計算
         # ===========================================================================
         # プロトタイプベースの対照損失
+        # print("model.module.efm: ", model.module.efm)
         loss = criterion(output, features, labels, index, target_labels)
         write_csv(loss.item(), opt.result_path, "issupcon_loss", opt.target_task, epoch)
 

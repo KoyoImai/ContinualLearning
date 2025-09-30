@@ -22,8 +22,6 @@ from util import seed_everything, save_model
 
 
 
-
-
 def parse_option():
     
     parser = argparse.ArgumentParser('argument for training')
