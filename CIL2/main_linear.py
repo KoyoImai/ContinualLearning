@@ -29,7 +29,7 @@ def parse_option():
 
     # 基本的な実験設定
     parser.add_argument("--log_name", type=str, default="test")
-    parser.add_argument('--method', type=str, default='cclis', choices=['er', 'co2l', 'cclis', 'prco', 'prco-fimcl'])
+    parser.add_argument('--method', type=str, default='cclis', choices=['er', 'co2l', 'cclis', 'prco', 'prco-fimcl', 'prco-fimclv2'])
 
     # データセット関連
     parser.add_argument('--data_folder', type=str, default='/home/kouyou/Datasets/', help='path to custom dataset')
@@ -185,19 +185,10 @@ def make_setup(opt):
 
         model = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed, opt=opt)
 
-    elif opt.method in ["prco-fimcl"]:
+    elif opt.method in ["prco-fimcl", "prco-fimclv2"]:
 
         if opt.dataset in ["cifar10", "cifar100", "tiny-imagenet"]:
             from models.resnet_cifar_prco import SupConResNet
-        elif opt.dataset in ["imagenet"]:
-            assert False
-        
-        model = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed, opt=opt)
-
-    elif opt.method in ["prco-fimcl"]:
-
-        if opt.dataset in ["cifar10", "cifar100", "tiny-imagenet"]:
-            from models.resnet_cifar_prco_fimcl import SupConResNet
         elif opt.dataset in ["imagenet"]:
             assert False
         
