@@ -635,12 +635,64 @@ def ncm_cclis(opt, model, ncm_loader, val_loader):
     print("val_labels.shape:", val_labels.shape)
 
 
+
+    # NCM分類を実行して精度を計算
+    # ==========================================================
     pred_labels_euclidean, acc_euclidean = ncm_classify(val_encoded, val_labels, class_mean_encoded, metric="euclidean")
     pred_labels_cosine, acc_cosine = ncm_classify(val_encoded, val_labels, class_mean_encoded, metric="cosine")
+    
+    
+    # タスク増加での精度を計算
+    task_acc_euclidean = []
+    task_acc_cosine = []
+
+    for taskid in range(opt.target_task + 1):
+        start_class = taskid * opt.cls_per_task
+        end_class   = (taskid + 1) * opt.cls_per_task
+
+        # 該当タスクの検証データを抽出
+        mask = (val_labels >= start_class) & (val_labels < end_class)
+        task_val_encoded = val_encoded[mask]
+        task_val_labels  = val_labels[mask]
+
+        if len(task_val_labels) == 0:
+            print(f"Task {taskid}: 検証データなし")
+            continue
+
+        # 該当クラスの平均特徴を抽出
+        task_class_mean_encoded = {cls: class_mean_encoded[cls] 
+                                   for cls in range(start_class, end_class) 
+                                   if cls in class_mean_encoded}
+
+        # NCM分類を実行
+        pred_euc, acc_euc = ncm_classify(task_val_encoded, task_val_labels, task_class_mean_encoded, metric="euclidean")
+        pred_cos, acc_cos = ncm_classify(task_val_encoded, task_val_labels, task_class_mean_encoded, metric="cosine")
+
+        task_acc_euclidean.append(acc_euc)
+        task_acc_cosine.append(acc_cos)
+
+        print(f"[Task {taskid}] Euclidean: {acc_euc:.4f}, Cosine: {acc_cos:.4f}")
+
+
+    # 全体の平均精度
+    mean_acc_euc = sum(task_acc_euclidean) / len(task_acc_euclidean)
+    mean_acc_cos = sum(task_acc_cosine) / len(task_acc_cosine)
+
+    pred_labels_euclidean, acc_euclidean = ncm_classify(val_encoded, val_labels, class_mean_encoded, metric="euclidean")
+    pred_labels_cosine, acc_cosine = ncm_classify(val_encoded, val_labels, class_mean_encoded, metric="cosine")
+
+    
+    print("=== Summary ===")
     print("acc_euclidean: ", acc_euclidean)
     print("acc_cosine: ", acc_cosine)
+    print("Task-wise Euclidean acc:", task_acc_euclidean)
+    print("Task-wise Cosine acc   :", task_acc_cosine)
+    print("Mean Euclidean acc:", mean_acc_euc)
+    print("Mean Cosine acc   :", mean_acc_cos)
+    
+    
 
-    return acc_euclidean, acc_cosine
+    return acc_euclidean, acc_cosine, task_acc_euclidean, task_acc_cosine
 
     
 

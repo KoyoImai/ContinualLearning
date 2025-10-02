@@ -109,7 +109,7 @@ def set_loader(opt, model, replay_indices, method_tools):
         model.module.subset_sample_num = subset_sample_num
         model.module.post_loader = post_loader
     
-    elif opt.method in ["prco", "prco-fimcl"]:
+    elif opt.method in ["prco", "prco-fimcl", "prco-fimclv2"]:
 
         if opt.dataset == "cifar10":
             train_loader, subset_indices, subset_sample_num = set_loader_prco_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices, model=model, training=True)
@@ -260,17 +260,21 @@ def set_loader_ncm(opt, model, replay_indices, method_tools):
         val_loader = set_valloader_co2l_cifar10(opt=opt, normalize=normalize)
         linear_loader = set_linearloader_co2l_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices)
         ncm_loader, _ = set_ncmloader_er_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices)
+        taskil_loaders = set_taskil_valloader_er_cifar10(opt=opt, normalize=normalize)
     elif opt.dataset == "cifar100":
         val_loader = set_valloader_co2l_cifar100(opt=opt, normalize=normalize)
         linear_loader = set_linearloader_co2l_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices)
         ncm_loader, _ = set_ncmloader_er_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices)
+        taskil_loaders = set_taskil_valloader_er_cifar100(opt=opt, normalize=normalize)
     elif opt.dataset == 'tiny-imagenet':
         val_loader = set_valloader_co2l_tinyimagenet(opt=opt, normalize=normalize)
         linear_loader = set_linearloader_co2l_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices)
         ncm_loader, _ = set_ncmloader_er_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices)
-    
+        # ncm_loader = None
+        taskil_loaders = set_taskil_valloader_er_tinyimagenet(opt=opt, normalize=normalize)
+        taskil_loaders = None
 
-    dataloaders = {"val": val_loader, "linear": linear_loader, "ncm": ncm_loader}
+    dataloaders = {"val": val_loader, "linear": linear_loader, "ncm": ncm_loader, "taskil": taskil_loaders}
 
 
     return dataloaders
@@ -363,7 +367,7 @@ def set_buffer(opt, model, prev_indices=None, method_tools=None):
         model.module.importance_weight = importance_weight
         model.module.val_targets = val_targets
     
-    elif opt.method in ["prco", "prco-fimcl"]:
+    elif opt.method in ["prco", "prco-fimcl", "prco-fimclv2"]:
 
         if opt.mem_type == "ring":
             from dataloaders.buffer_er import set_replay_samples_ring

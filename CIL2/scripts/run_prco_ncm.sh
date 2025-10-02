@@ -12,8 +12,8 @@ export MEM_TYPE="ring"
 export MEM_SIZE=500
 export DATASET="cifar100"
 export SEED=0
-export LOG_NAME="prco"
-export DATE="2025_0910"
+export LOG_NAME="prco-w-efm-lambda5"
+export DATE="2025_0916"
 
 
 
@@ -23,6 +23,9 @@ export DATE="2025_0910"
 
 
 
+python main_ncm.py --method ${METHOD} --mem_type ${MEM_TYPE} --mem_size ${MEM_SIZE} --dataset ${DATASET} --seed ${SEED} --log_name ${LOG_NAME} --date ${DATE} \
+                --target_task 4 --target_epoch 100
+                
 
 python main_ncm.py --method ${METHOD} --mem_type ${MEM_TYPE} --mem_size ${MEM_SIZE} --dataset ${DATASET} --seed ${SEED} --log_name ${LOG_NAME} --date ${DATE} \
                 --target_task 0 --target_epoch 500

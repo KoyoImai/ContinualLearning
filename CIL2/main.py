@@ -29,7 +29,7 @@ def parse_option():
 
     # 基本的な実験設定
     parser.add_argument("--log_name", type=str, default="test")
-    parser.add_argument('--method', type=str, default='cclis', choices=['er', 'co2l', 'cclis', 'prco', 'prco-fimcl'])
+    parser.add_argument('--method', type=str, default='cclis', choices=['er', 'co2l', 'cclis', 'prco', 'prco-fimcl', 'prco-fimclv2'])
 
     # データセット関連
     parser.add_argument('--data_folder', type=str, default='/home/kouyou/Datasets/', help='path to custom dataset')
@@ -79,6 +79,8 @@ def parse_option():
     parser.add_argument('--temp_prco', type=float, default=0.5)
     parser.add_argument('--lambda_efm', type=float, default=10.0)    # 論文値
     parser.add_argument('--eta_efm', type=float, default=0.1)
+    parser.add_argument('--add_epoch', type=int, default=40)   # PRCO-fimclv2で追加学習を行うエポック数
+
     
 
     # その他の設定
@@ -250,7 +252,7 @@ def make_setup(opt):
         method_tools = {"optimizer": optimizer}
     
 
-    elif opt.method in ["prco-fimcl"]:
+    elif opt.method in ["prco-fimcl", "prco-fimclv2"]:
 
         from losses.loss_prco_fimcl import ProtoSupConLoss
 
@@ -294,8 +296,6 @@ def make_setup(opt):
         model2 = torch.nn.DataParallel(model2)
 
     return model, model2, criterion, method_tools
-    
-
 
 
 def make_scheduler(opt, epochs, dataloader, method_tools):
@@ -319,13 +319,14 @@ def make_scheduler(opt, epochs, dataloader, method_tools):
     elif opt.method in ["cclis"]:
         scheduler = None
 
-    elif opt.method in ["prco", "prco-fimcl"]:
+    elif opt.method in ["prco", "prco-fimcl", "prco-fimclv2"]:
         scheduler = None
     
     else:
         assert False
 
     return scheduler, method_tools
+
 
 
 
@@ -427,7 +428,7 @@ def main():
             
 
         # タスク終了後の後処理（gpmなどの後処理が必要な手法のため）
-        post_process(opt=opt, model=model, model2=model2, dataloader=dataloader, criterion=criterion, method_tools=method_tools, replay_indices=replay_indices)
+        post_process(opt=opt, model=model, model2=model2, dataloader=dataloader, criterion=criterion, optimizer=method_tools["optimizer"], method_tools=method_tools, replay_indices=replay_indices)
 
         # 保存（opt.model_path）
         file_path = f"{opt.model_path}/model_{opt.target_task:02d}.pth"
