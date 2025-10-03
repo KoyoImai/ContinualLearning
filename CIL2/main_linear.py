@@ -185,7 +185,7 @@ def make_setup(opt):
 
         model = SupConResNet(name='resnet18', head='mlp', feat_dim=128, seed=opt.seed, opt=opt)
 
-    elif opt.method in ["prco-fimcl", "prco-fimclv2", 'prco-fimclv2']:
+    elif opt.method in ["prco-fimcl", "prco-fimclv2", 'prco-fimclv3']:
 
         if opt.dataset in ["cifar10", "cifar100", "tiny-imagenet"]:
             from models.resnet_cifar_prco import SupConResNet

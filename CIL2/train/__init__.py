@@ -75,7 +75,7 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
 
         adjust_learning_rate_cclis(opt, optimizer, epoch)
 
-        if (epoch > 100) and opt.tagrget_task != 0:
+        if (epoch > 100) and opt.target_task != 0:
             cal_fim = True
         else:
             cal_fim = False
