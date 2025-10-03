@@ -35,25 +35,6 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
         loss, model2 = train_co2l(opt=opt, model=model, model2=model2, criterion=criterion, optimizer=optimizer,
                                   scheduler=scheduler, train_loader=train_loader, epoch=epoch)
     
-        if opt.eval and (epoch % opt.val_freq == 0):
-            classil_acc, taskil_acc, all_task_accuracies, all_task_knn_accuracies, all_task_losses, classifier = val_co2l(opt, model, model2, linear_loader, val_loader, taskil_loaders, knn_train_loaders, epoch)
-
-            # 各タスクの精度を「task0 acc=100.00, task1 acc=90.00」の形式で整形
-            taskil_acc_str = ', '.join([f"task{i} acc={acc:.2f}" for i, acc in enumerate(all_task_accuracies)])
-            taskil_knnacc_str = ', '.join([f"task{i} knnacc={acc:.5f}" for i, acc in enumerate(all_task_knn_accuracies)])
-
-            ncm_acc = ncm_co2l(model, ncm_loader, val_loader)
-
-            logger.info(f"task {opt.target_task} Epoch {epoch}: train_loss={loss:.4f}, \
-                        ClassIL_accuracy={classil_acc:.3f}, TaskIL_accuracy={taskil_acc:.3f}, NCM_accuracy={ncm_acc:.3f}, \
-                        {taskil_acc_str}, {taskil_knnacc_str}")
-        
-            # classifierの保存
-            dir_path = f"{opt.model_path}/task{opt.target_task:02d}"
-            file_path = f"{dir_path}/classifier_epoch{epoch:03d}.pth"
-            if not os.path.exists(dir_path):
-                os.makedirs(dir_path)
-            save_classifier(classifier, opt, opt.epochs, file_path)
 
     elif opt.method == "cclis":
 
@@ -64,26 +45,6 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
 
         loss, model2 = train_cclis(opt=opt, model=model, model2=model2, criterion=criterion, optimizer=optimizer,
                                    train_loader=train_loader, epoch=epoch, subset_sample_num=subset_sample_num, score_mask=score_mask)
-
-        if opt.eval and (epoch % opt.val_freq == 0):
-            classil_acc, taskil_acc, all_task_accuracies, all_task_knn_accuracies, all_task_losses, classifier = val_cclis(opt, model, model2, linear_loader, val_loader, taskil_loaders, knn_train_loaders, epoch)
-
-            # 各タスクの精度を「task0 acc=100.00, task1 acc=90.00」の形式で整形
-            taskil_acc_str = ', '.join([f"task{i} acc={acc:.2f}" for i, acc in enumerate(all_task_accuracies)])
-            taskil_knnacc_str = ', '.join([f"task{i} knnacc={acc:.5f}" for i, acc in enumerate(all_task_knn_accuracies)])
-
-            ncm_acc = ncm_cclis(model, ncm_loader, val_loader)
-
-            logger.info(f"task {opt.target_task} Epoch {epoch}: train_loss={loss:.4f}, \
-                        ClassIL_accuracy={classil_acc:.3f}, TaskIL_accuracy={taskil_acc:.3f}, NCM_accuracy={ncm_acc:.3f}, \
-                        {taskil_acc_str}, {taskil_knnacc_str}")
-        
-            # classifierの保存
-            dir_path = f"{opt.model_path}/task{opt.target_task:02d}"
-            file_path = f"{dir_path}/classifier_epoch{epoch:03d}.pth"
-            if not os.path.exists(dir_path):
-                os.makedirs(dir_path)
-            save_classifier(classifier, opt, opt.epochs, file_path)
         
 
     elif opt.method == "prco":
