@@ -69,6 +69,19 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
 
         loss, model2 = train_prco_fimclv2(opt=opt, model=model, model2=model2, criterion=criterion,
                                           optimizer=optimizer, train_loader=train_loader, epoch=epoch)
+    
+
+    elif opt.method == "prco-fimclv3":
+
+        adjust_learning_rate_cclis(opt, optimizer, epoch)
+
+        if (epoch > 100) and opt.tagrget_task != 0:
+            cal_fim = True
+        else:
+            cal_fim = False
+
+        loss, model2 = train_prco_fimclv2(opt=opt, model=model, model2=model2, criterion=criterion,
+                                          optimizer=optimizer, train_loader=train_loader, epoch=epoch, cal_fim=False)
 
 
 

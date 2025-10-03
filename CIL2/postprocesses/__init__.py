@@ -31,7 +31,7 @@ def post_process(opt, model, model2, dataloader, criterion, optimizer, method_to
             postprocess_prco(opt=opt, model=model, train_loader=linear_loader)
         return 
 
-    elif opt.method in ["prco-fimcl"]:
+    elif opt.method in ["prco-fimcl", "prco-fimclv3"]:
 
         if opt.distill_type == "EFC":
             postprocess_prco_fimcl(opt=opt, model=model, train_loader=linear_loader)
