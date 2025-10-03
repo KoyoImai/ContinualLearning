@@ -109,7 +109,7 @@ def set_loader(opt, model, replay_indices, method_tools):
         model.module.subset_sample_num = subset_sample_num
         model.module.post_loader = post_loader
     
-    elif opt.method in ["prco", "prco-fimcl", "prco-fimclv2"]:
+    elif opt.method in ["prco", "prco-fimcl", "prco-fimclv2", "prco-fimclv3"]:
 
         if opt.dataset == "cifar10":
             train_loader, subset_indices, subset_sample_num = set_loader_prco_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices, model=model, training=True)
