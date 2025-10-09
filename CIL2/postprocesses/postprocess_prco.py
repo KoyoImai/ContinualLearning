@@ -30,7 +30,7 @@ def postprocess_prco(opt, model, train_loader):
         # print("labels.shape: ", labels.shape)    # labels.shape:  torch.Size([512])
 
         # 特徴量獲得
-        encoded, features, output = model(images, cal_fim=True)
+        encoded, features, output = model(images)
         # print("features.shape: ", features.shape)   # features.shape:  torch.Size([512, 128])
         # print("output.shape: ", output.shape)       # output.shape:  torch.Size([512, 10])
 

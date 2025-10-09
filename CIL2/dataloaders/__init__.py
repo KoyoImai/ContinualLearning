@@ -389,7 +389,7 @@ def set_buffer(opt, model, prev_indices=None, method_tools=None):
         model.module.importance_weight = importance_weight
         model.module.val_targets = val_targets
     
-    elif opt.method in ["prco", "prco-fimcl", "prco-fimclv2", "prco-fimclv3"]:
+    elif opt.method in ["prco", "prco-fimcl", "prco-fimclv2", "prco-fimclv3", "prco-efm"]:
 
         if opt.mem_type == "ring":
             from dataloaders.buffer_er import set_replay_samples_ring

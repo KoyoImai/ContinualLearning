@@ -6,10 +6,10 @@ export CUDA_VISIBLE_DEVICES="3"
 
 
 # 基本設定（log_name関連）
-export METHOD="prco"
+export METHOD="prco-efm"
 export MEM_TYPE="kmeans"
 export MEM_SIZE=500
-export DATASET="tiny-imagenet"
+export DATASET="cifar100"
 export SEED=0
 export LOG_NAME="test"
 export DATE="2025_0926"
@@ -20,15 +20,15 @@ export BATCH_SIZE=512
 export LEARNING_RATE=1.0
 export LEARNING_RATE_PROTOTYPES=0.01
 
-export EPOCHS=10
-export START_EPOCH=10
+export EPOCHS=5
+export START_EPOCH=5
 
 
 # PRCO特有の設定
 export TEMP_PRCO=0.5
 export CURRENT_TEMP=0.2
 export PAST_TEMP=0.1
-export DISTILL_TYPE="ND"    # PRD. EFC, ND
+export DISTILL_TYPE="EFC"    # PRD. EFC, ND
 export DISTILL_POWER=1.0
 
 

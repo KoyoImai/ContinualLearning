@@ -47,7 +47,7 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
                                    train_loader=train_loader, epoch=epoch, subset_sample_num=subset_sample_num, score_mask=score_mask)
         
 
-    elif opt.method == "prco":
+    elif opt.method in ["prco", "prco-efm"]:
 
         adjust_learning_rate_cclis(opt, optimizer, epoch)
 

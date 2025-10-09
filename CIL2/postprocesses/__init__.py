@@ -26,7 +26,7 @@ def post_process(opt, model, model2, dataloader, criterion, optimizer, method_to
         postprocess_cclis(opt, model, model2, criterion, replay_indices)
         return 
 
-    elif opt.method in ["prco"]:
+    elif opt.method in ["prco", "prco-efm"]:
         if opt.distill_type == "EFC":
             postprocess_prco(opt=opt, model=model, train_loader=linear_loader)
         return 
