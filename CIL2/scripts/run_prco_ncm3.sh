@@ -8,21 +8,20 @@ export CUDA_VISIBLE_DEVICES="3"
 
 # 基本設定（log_name関連）
 export METHOD="prco"
-export MEM_TYPE="ring"
+export MEM_TYPE="kmeans"
 export MEM_SIZE=500
 export DATASET="cifar100"
 export SEED=0
-export LOG_NAME="prco-w-nd"
-export DATE="2025_0911"
+export LOG_NAME="prco-w-nd-kmeans"
+export DATE="2025_0919"
 
 
 
 
-# python main_ncm.py --method ${METHOD} --mem_type ${MEM_TYPE} --mem_size ${MEM_SIZE} --dataset ${DATASET} --seed ${SEED} --log_name ${LOG_NAME} --date ${DATE} \
-#                 --target_task 1 --target_epoch 9
 
 
-
+python main_ncm.py --method ${METHOD} --mem_type ${MEM_TYPE} --mem_size ${MEM_SIZE} --dataset ${DATASET} --seed ${SEED} --log_name ${LOG_NAME} --date ${DATE} \
+                --target_task 4 --target_epoch 100
 
 
 python main_ncm.py --method ${METHOD} --mem_type ${MEM_TYPE} --mem_size ${MEM_SIZE} --dataset ${DATASET} --seed ${SEED} --log_name ${LOG_NAME} --date ${DATE} \

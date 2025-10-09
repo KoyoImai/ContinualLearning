@@ -29,7 +29,7 @@ def parse_option():
 
     # 基本的な実験設定
     parser.add_argument("--log_name", type=str, default="test")
-    parser.add_argument('--method', type=str, default='cclis', choices=['er', 'co2l', 'cclis', 'prco', 'prco-fimcl', 'prco-fimclv2', 'prco-fimclv3'])
+    parser.add_argument('--method', type=str, default='cclis', choices=['er', 'co2l', 'cclis', 'prco', 'prco-fimcl', 'prco-fimclv2', 'prco-fimclv3', 'prco-efm'])
 
     # データセット関連
     parser.add_argument('--data_folder', type=str, default='/home/kouyou/Datasets/', help='path to custom dataset')
@@ -221,7 +221,7 @@ def make_setup(opt):
                             weight_decay=opt.weight_decay)
         method_tools = {"optimizer": optimizer}
 
-    elif opt.method in ["prco"]:
+    elif opt.method in ["prco", "prco-efm"]:
 
         from losses.loss_prco import ProtoSupConLoss
 
@@ -319,7 +319,7 @@ def make_scheduler(opt, epochs, dataloader, method_tools):
     elif opt.method in ["cclis"]:
         scheduler = None
 
-    elif opt.method in ["prco", "prco-fimcl", "prco-fimclv2", "prco-fimclv3"]:
+    elif opt.method in ["prco", "prco-fimcl", "prco-fimclv2", "prco-fimclv3", "prco-efm"]:
         scheduler = None
     
     else:
