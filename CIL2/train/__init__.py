@@ -129,7 +129,7 @@ def eval(model, dataloader, opt):
         write_csv(all_task_knn_accuracies, opt.result_path, "all_task_knn_acc", opt.target_task, opt.target_epoch)
     
 
-    elif opt.method == "prco":
+    elif opt.method in ["prco", "prco-efm"]:
 
         classil_acc, taskil_acc, all_task_accuracies, all_task_knn_accuracies, all_task_losses, classifier = val_cclis(opt, model, None, linear_loader, val_loader, taskil_loaders, knn_train_loaders, opt.target_epoch)
         write_csv(classil_acc, opt.result_path, "classil_acc", opt.target_task, opt.target_epoch)
@@ -226,7 +226,7 @@ def eval4timnet(model, dataloader, opt):
         write_csv(all_task_accuracies, opt.result_path, "all_task_acc", opt.target_task, opt.target_epoch)
         write_csv(all_task_knn_accuracies, opt.result_path, "all_task_knn_acc", opt.target_task, opt.target_epoch)
 
-    elif opt.method in ["prco"]:
+    elif opt.method in ["prco", 'prco-efm']:
 
         # classil_acc, taskil_acc, all_task_accuracies, all_task_knn_accuracies, all_task_losses, classifier = val_cclis(opt, model, None, linear_loader, val_loader, taskil_loaders, knn_train_loaders, opt.target_epoch)
         classil_acc, taskil_acc, all_task_accuracies, all_task_knn_accuracies, classifier = val_cclis4timnet(opt, model, None, linear_loader, val_loader, taskil_loaders, knn_train_loaders, opt.target_epoch)

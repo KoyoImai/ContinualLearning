@@ -29,7 +29,7 @@ def parse_option():
 
     # 基本的な実験設定
     parser.add_argument("--log_name", type=str, default="test")
-    parser.add_argument('--method', type=str, default='cclis', choices=['er', 'co2l', 'cclis', 'prco', 'prco-fimcl', 'prco-fimclv2', 'prco-fimclv3'])
+    parser.add_argument('--method', type=str, default='cclis', choices=['er', 'co2l', 'cclis', 'prco', 'prco-fimcl', 'prco-fimclv2', 'prco-fimclv3', 'prco-efm'])
 
     # データセット関連
     parser.add_argument('--data_folder', type=str, default='/home/kouyou/Datasets/', help='path to custom dataset')
@@ -178,7 +178,7 @@ def make_setup(opt):
 
         model = SupConResNet(name='resnet18', head='mlp', feat_dim=opt.feat_dim, seed=opt.seed, opt=opt)
 
-    elif opt.method in ["prco"]:
+    elif opt.method in ["prco", 'prco-efm']:
 
         if opt.dataset in ["cifar10", "cifar100", "tiny-imagenet"]:
             from models.resnet_cifar_prco import SupConResNet
