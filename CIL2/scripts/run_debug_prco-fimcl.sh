@@ -9,10 +9,10 @@ export CUDA_VISIBLE_DEVICES="3"
 export METHOD="prco-fimclv2"
 export MEM_TYPE="kmeans"
 export MEM_SIZE=500
-export DATASET="cifar10"
+export DATASET="cifar100"
 export SEED=0
-export LOG_NAME="test-kmeans"
-export DATE="2025_0918"
+export LOG_NAME="test-add-lr"
+export DATE="2025_1010"
 
 
 # 学習のハイパラ関連
@@ -20,16 +20,21 @@ export BATCH_SIZE=512
 export LEARNING_RATE=1.0
 export LEARNING_RATE_PROTOTYPES=0.01
 
-export EPOCHS=5
-export START_EPOCH=5
+export EPOCHS=30
+export START_EPOCH=30
 
+export FEAT_DIM=128
 
-# PRCO特有の設定
+# PRCO特有設定
 export TEMP_PRCO=0.5
 export CURRENT_TEMP=0.2
 export PAST_TEMP=0.1
 export DISTILL_TYPE="EFC"    # PRD. EFC, ND
 export DISTILL_POWER=1.0
+export LAMBDA_EFM=10
+export ETA_EFM=0.1
+export ADD_EPOCH=30
+export ADD_LEARNING_RATE=0.05
 
 
 # 線形分類関連のハイパラ
@@ -48,6 +53,8 @@ python main.py --method ${METHOD} --mem_type ${MEM_TYPE} --mem_size ${MEM_SIZE} 
                 --batch_size ${BATCH_SIZE} --learning_rate ${LEARNING_RATE} --learning_rate_prototypes ${LEARNING_RATE_PROTOTYPES} \
                 --epochs ${EPOCHS} --start_epoch ${START_EPOCH} \
                 --temp_prco ${TEMP_PRCO} --current_temp ${CURRENT_TEMP} --past_temp ${PAST_TEMP} --distill_type ${DISTILL_TYPE} --distill_power ${DISTILL_POWER} \
+                --lambda_efm ${LAMBDA_EFM} --eta_efm ${ETA_EFM} --feat_dim ${FEAT_DIM} \
+                --add_epoch ${ADD_EPOCH} --add_learning_rate ${ADD_LEARNING_RATE} \
                 --linear_learning_rate ${LINEAR_LEARNING_RATE} --linear_epochs ${LINEAR_EPOCHS} --val_freq ${VAL_FREQ} \
                 --epoch_save --cosine 
 

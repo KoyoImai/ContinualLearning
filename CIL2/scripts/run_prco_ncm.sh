@@ -7,13 +7,13 @@ export CUDA_VISIBLE_DEVICES="1"
 
 
 # 基本設定（log_name関連）
-export METHOD="prco"
+export METHOD="prco-efm"
 export MEM_TYPE="kmeans"
 export MEM_SIZE=500
 export DATASET="cifar100"
 export SEED=0
-export LOG_NAME="prco-w-efm-lambda5-kmeans"
-export DATE="2025_0918"
+export LOG_NAME="prcoefm-lambda10-kmeans"
+export DATE="2025_1009"
 
 
 

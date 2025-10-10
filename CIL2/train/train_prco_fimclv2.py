@@ -44,7 +44,7 @@ def adjust_learning_rate_prco(args, optimizer, epoch):
 
 
 def adjust_learning_rate_prco_addlearning(args, optimizer, epoch):
-    lr_enc = args.learning_rate
+    lr_enc = args.add_learning_rate
     lr_prot = args.learning_rate_prototypes
     if args.cosine:
         eta_min_enc = lr_enc * (args.lr_decay_rate ** 3)
@@ -76,6 +76,21 @@ def warmup_learning_rate(args, epoch, batch_id, total_batches, optimizer):
 
         for idx, param_group in enumerate(optimizer.param_groups):
             param_group['lr'] = lr_list[idx]
+
+
+def warmup_learning_rate_addlearning(args, epoch, batch_id, total_batches, optimizer):
+    if args.warm and epoch <= args.add_warm_epochs:
+        p = (batch_id + (epoch - 1) * total_batches) / \
+            (args.add_warm_epochs * total_batches)
+        lr_enc = args.add_warmup_from_enc + p * (args.add_warmup_to_enc - args.add_warmup_from_enc)
+        lr_prot = args.add_warmup_from_prot + p * (args.add_warmup_to_prot - args.add_warmup_from_prot)
+        lr_list = [lr_enc, lr_enc, lr_prot]
+
+        for idx, param_group in enumerate(optimizer.param_groups):
+            param_group['lr'] = lr_list[idx]
+
+
+
 
 
 
@@ -120,9 +135,12 @@ def train_prco_fimclv2(opt, model, model2, criterion, optimizer, train_loader, e
             w = nn.functional.normalize(w, dim=1, p=2)
             model.module.prototypes.weight.copy_(w)
 
-        # warmup処理
-        warmup_learning_rate(opt, epoch, idx, len(train_loader), optimizer)
-        
+        # warmup処理（追加学習の場合，warmupの挙動を変える）
+        if not cal_fim:
+            warmup_learning_rate(opt, epoch, idx, len(train_loader), optimizer)
+        else:
+            assert False
+
         _, features, features_non, output = model(images, cal_fim=cal_fim)
         output = output.T
 

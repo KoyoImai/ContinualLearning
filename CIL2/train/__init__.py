@@ -83,11 +83,6 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
         loss, model2 = train_prco_fimclv2(opt=opt, model=model, model2=model2, criterion=criterion,
                                           optimizer=optimizer, train_loader=train_loader, epoch=epoch, cal_fim=False)
 
-
-
-
-
-
     
     else:
 
@@ -177,7 +172,7 @@ def eval_ncm(model, dataloader, opt):
         write_csv(task_acc_euclidean, opt.result_path, "ncm_taskil_euclidean_acc", opt.target_task, opt.target_epoch)
         write_csv(task_acc_cosine, opt.result_path, "ncm_taskil_cosine_acc", opt.target_task, opt.target_epoch)
 
-    elif opt.method == "prco":
+    elif opt.method in ["prco", 'prco-fimclv2', 'prco-efm']:
 
         acc_euclidean, acc_cosine, task_acc_euclidean, task_acc_cosine = ncm_cclis(opt=opt, model=model, ncm_loader=ncm_loader, val_loader=val_loader)
         write_csv(acc_euclidean, opt.result_path, "ncm_euclidean_acc", opt.target_task, opt.target_epoch)

@@ -65,6 +65,10 @@ def set_linearloader_efm_cifar10(opt, normalize, replay_indices):
 
 
 
+
+
+
+
 # EFM計算用 cifar100
 def set_linearloader_efm_cifar100(opt, normalize, replay_indices):
 

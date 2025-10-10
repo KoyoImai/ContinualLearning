@@ -10,13 +10,25 @@ def preprocess_prco(opt, model, method_tools):
         opt.warmup_from_enc = 0.01
         opt.warmup_from_prot = 0.001
         opt.warm_epochs = 10
+
+        opt.add_warmup_from_enc = 0.01
+        opt.add_warmup_from_prot = 0.001
+        opt.add_warm_epochs = 10
+
         if opt.cosine:
             eta_min_encoder = opt.learning_rate * (opt.lr_decay_rate ** 3)
             eta_min_prototypes = opt.learning_rate_prototypes * (opt.lr_decay_rate ** 3)
+            
             opt.warmup_to_enc = eta_min_encoder + (opt.learning_rate - eta_min_encoder) * (
                     1 + math.cos(math.pi * opt.warm_epochs / opt.epochs)) / 2
             opt.warmup_to_prot = eta_min_prototypes + (opt.learning_rate_prototypes - eta_min_prototypes) * (
                     1 + math.cos(math.pi * opt.warm_epochs / opt.epochs)) / 2
+            
+            opt.add_warmup_to_enc = eta_min_encoder + (opt.add_learning_rate - eta_min_encoder) * (
+                    1 + math.cos(math.pi * opt.add_warm_epochs / opt.add_epoch)) / 2
+            opt.add_warmup_to_prot = eta_min_prototypes + (opt.add_learning_rate_prototypes - eta_min_prototypes) * (
+                    1 + math.cos(math.pi * opt.add_warm_epochs / opt.add_epoch)) / 2
+
         else:
             opt.warmup_to_enc = opt.learning_rate
             opt.warmup_to_prot = opt.learning_rate_prototypes
