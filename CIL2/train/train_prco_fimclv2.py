@@ -139,7 +139,7 @@ def train_prco_fimclv2(opt, model, model2, criterion, optimizer, train_loader, e
         if not cal_fim:
             warmup_learning_rate(opt, epoch, idx, len(train_loader), optimizer)
         else:
-            assert False
+            warmup_learning_rate_addlearning(opt, epoch, idx, len(train_loader), optimizer)
 
         _, features, features_non, output = model(images, cal_fim=cal_fim)
         output = output.T
