@@ -38,6 +38,7 @@ def postprocess_prco(opt, model, train_loader):
         logits = output
 
         # 温度スケーリング
+        # tau = 0.1            # 2025/10/10までは0.1で固定していた（2025/10/11に修正）
         tau = opt.temp_prco
         logits = logits / tau
 
@@ -52,6 +53,7 @@ def postprocess_prco(opt, model, train_loader):
 
         # バッチサイズB，クラス数C
         B, C = logp.shape
+        
 
         # projectorの出力次元数
         D = features.shape[1]          # 特徴次元 (= 128)
