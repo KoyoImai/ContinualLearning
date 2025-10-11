@@ -53,7 +53,6 @@ def postprocess_prco(opt, model, train_loader):
 
         # バッチサイズB，クラス数C
         B, C = logp.shape
-        
 
         # projectorの出力次元数
         D = features.shape[1]          # 特徴次元 (= 128)
