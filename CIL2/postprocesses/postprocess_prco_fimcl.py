@@ -38,7 +38,7 @@ def postprocess_prco(opt, model, train_loader):
         logits = output
 
         # 温度スケーリング
-        tau = 0.1
+        tau = opt.temp_prco
         logits = logits / tau
 
         # log-softmax と確率
