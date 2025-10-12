@@ -28,7 +28,11 @@ def post_process(opt, model, model2, dataloader, criterion, optimizer, method_to
 
     elif opt.method in ["prco", "prco-efm"]:
         if opt.distill_type == "EFC":
-            postprocess_prco(opt=opt, model=model, train_loader=linear_loader)
+            postprocess_prco(opt=opt, model=model, train_loader=linear_loader, feat=True)
+
+        elif opt.distill_type == "EFCv2":
+            postprocess_prco(opt=opt, model=model, train_loader=linear_loader, feat=False)
+
         return 
 
     elif opt.method in ["prco-fimcl", "prco-fimclv3"]:
@@ -68,6 +72,7 @@ def post_process(opt, model, model2, dataloader, criterion, optimizer, method_to
         if opt.distill_type == "EFC":
             postprocess_prco_fimcl(opt=opt, model=model, train_loader=linear_loader)
             model.module.update_efm(opt=opt)
+
         
         else:
 

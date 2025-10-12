@@ -8,7 +8,7 @@ import torch.nn.functional as F
 # Experience Feature Matrix (EFM) を計算
 # Projector の出力変化で outputs がどう変化するかを計算
 # =====================================================
-def postprocess_prco(opt, model, train_loader):
+def postprocess_prco(opt, model, train_loader, feat=True):
 
     # 変数初期化
     E_sum = None
@@ -53,9 +53,11 @@ def postprocess_prco(opt, model, train_loader):
         # バッチサイズB，クラス数C
         B, C = logp.shape
 
-        # projectorの出力次元数
-        D = features.shape[1]          # 特徴次元 (= 128)
-
+        # projectorかEncoder出力次元数
+        if feat:
+            D = features.shape[1]          # 特徴次元 (= 128)
+        else:
+            D = encoded.shape[1]
 
         # どのクラスで期待値を取るか
         topk = None
@@ -80,7 +82,11 @@ def postprocess_prco(opt, model, train_loader):
             for c in idx_sel[b].tolist():
                 
                 # logp[b, c] はスカラー。features 全体 (B, D) への勾配を取り、当該サンプル b の行だけ抜く
-                g_bc_full = torch.autograd.grad(logp[b, c], features, retain_graph=True, create_graph=False)[0]  # (B, D)
+                if feat:
+                    g_bc_full = torch.autograd.grad(logp[b, c], features, retain_graph=True, create_graph=False)[0]  # (B, D)
+                else:
+                    g_bc_full = torch.autograd.grad(logp[b, c], encoded, retain_graph=True, create_graph=False)[0]  # (B, D)
+                    
                 g_bc = g_bc_full[b]   # (D,)
                 # print("g_bc: ", g_bc)
                 # print("g_bc.shape: ", g_bc.shape) # g_bc.shape:  torch.Size([128])

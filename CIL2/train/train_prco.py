@@ -105,7 +105,7 @@ def train_prco(opt, model, model2, criterion, optimizer, train_loader, epoch):
         # warmup処理
         warmup_learning_rate(opt, epoch, idx, len(train_loader), optimizer)
         
-        _, features, output = model(images)
+        encoded, features, output = model(images)
         output = output.T
 
         device = (torch.device('cuda')
@@ -216,6 +216,34 @@ def train_prco(opt, model, model2, criterion, optimizer, train_loader, epoch):
 
                 # lamda_{EMF} E_{t-1} + \eta I
                 M = opt.lambda_efm * efm + opt.eta_efm * torch.eye(D, device=features.device)
+
+                loss_reg = torch.einsum('bi,ij,bj->b', delta, M, delta).mean()
+                write_csv(loss_reg.item(), opt.result_path, "reg_loss", opt.target_task, epoch)
+                loss += opt.distill_power * loss_reg
+                distill.update(loss_reg.item(), bsz)
+                print("loss_reg: ", loss_reg)
+        
+
+        # encoderの出力でEFC蒸留
+        elif distill_type == "EFCv2":
+            if opt.target_task > 0:
+
+                # 過去モデルの出力を獲得
+                with torch.no_grad():
+                    encoded_pre, features_pre, output_pre = model2(images)
+                
+                # encodedの正規化
+                encoded = F.normalize(encoded, dim=1)
+                encoded_pre = F.normalize(encoded_pre, dim=1)
+                
+
+                D = encoded.shape[1]
+                
+                # Projector 出力の差分を計算
+                delta = encoded - encoded_pre
+
+                # lamda_{EMF} E_{t-1} + \eta I
+                M = opt.lambda_efm * efm + opt.eta_efm * torch.eye(D, device=encoded.device)
 
                 loss_reg = torch.einsum('bi,ij,bj->b', delta, M, delta).mean()
                 write_csv(loss_reg.item(), opt.result_path, "reg_loss", opt.target_task, epoch)

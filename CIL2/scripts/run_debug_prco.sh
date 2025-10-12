@@ -9,10 +9,10 @@ export CUDA_VISIBLE_DEVICES="3"
 export METHOD="prco-efm"
 export MEM_TYPE="kmeans"
 export MEM_SIZE=500
-export DATASET="tiny-imagenet"
+export DATASET="cifar100"
 export SEED=0
 export LOG_NAME="test"
-export DATE="2025_0926"
+export DATE="2025_1012"
 
 
 # 学習のハイパラ関連
@@ -28,7 +28,7 @@ export START_EPOCH=5
 export TEMP_PRCO=0.5
 export CURRENT_TEMP=0.2
 export PAST_TEMP=0.1
-export DISTILL_TYPE="EFC"    # PRD. EFC, ND
+export DISTILL_TYPE="EFCv2"    # PRD. EFC, ND
 export DISTILL_POWER=1.0
 
 
@@ -44,17 +44,17 @@ export VAL_FREQ=1000
 # python main.py --method prco --dataset cifar10 --distill_type None --cosine --start_epoch 11 --epochs 11 --val_freq 10 --linear_epochs 3 --log_name test --date 0906
 
 
-# python main.py --method ${METHOD} --mem_type ${MEM_TYPE} --mem_size ${MEM_SIZE} --dataset ${DATASET} --seed ${SEED} --log_name ${LOG_NAME} --date ${DATE} \
-#                 --batch_size ${BATCH_SIZE} --learning_rate ${LEARNING_RATE} --learning_rate_prototypes ${LEARNING_RATE_PROTOTYPES} \
-#                 --epochs ${EPOCHS} --start_epoch ${START_EPOCH} \
-#                 --temp_prco ${TEMP_PRCO} --current_temp ${CURRENT_TEMP} --past_temp ${PAST_TEMP} --distill_type ${DISTILL_TYPE} --distill_power ${DISTILL_POWER} \
-#                 --linear_learning_rate ${LINEAR_LEARNING_RATE} --linear_epochs ${LINEAR_EPOCHS} --val_freq ${VAL_FREQ} \
-#                 --epoch_save --cosine 
+python main.py --method ${METHOD} --mem_type ${MEM_TYPE} --mem_size ${MEM_SIZE} --dataset ${DATASET} --seed ${SEED} --log_name ${LOG_NAME} --date ${DATE} \
+                --batch_size ${BATCH_SIZE} --learning_rate ${LEARNING_RATE} --learning_rate_prototypes ${LEARNING_RATE_PROTOTYPES} \
+                --epochs ${EPOCHS} --start_epoch ${START_EPOCH} \
+                --temp_prco ${TEMP_PRCO} --current_temp ${CURRENT_TEMP} --past_temp ${PAST_TEMP} --distill_type ${DISTILL_TYPE} --distill_power ${DISTILL_POWER} \
+                --linear_learning_rate ${LINEAR_LEARNING_RATE} --linear_epochs ${LINEAR_EPOCHS} --val_freq ${VAL_FREQ} \
+                --epoch_save --cosine 
 
 
-python main_linear.py --method ${METHOD} --mem_type ${MEM_TYPE} --mem_size ${MEM_SIZE} --dataset ${DATASET} --seed ${SEED} --log_name ${LOG_NAME} --date ${DATE} \
-                --linear_learning_rate ${LINEAR_LEARNING_RATE} --linear_epochs ${LINEAR_EPOCHS} \
-                --target_task 0 --target_epoch 3
+# python main_linear.py --method ${METHOD} --mem_type ${MEM_TYPE} --mem_size ${MEM_SIZE} --dataset ${DATASET} --seed ${SEED} --log_name ${LOG_NAME} --date ${DATE} \
+#                 --linear_learning_rate ${LINEAR_LEARNING_RATE} --linear_epochs ${LINEAR_EPOCHS} \
+#                 --target_task 0 --target_epoch 3
 
 # python main_ncm.py --method ${METHOD} --mem_type ${MEM_TYPE} --mem_size ${MEM_SIZE} --dataset ${DATASET} --seed ${SEED} --log_name ${LOG_NAME} --date ${DATE} \
 #                 --linear_learning_rate ${LINEAR_LEARNING_RATE} --linear_epochs ${LINEAR_EPOCHS} \
