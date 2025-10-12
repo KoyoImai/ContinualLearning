@@ -38,7 +38,8 @@ def postprocess_prco(opt, model, train_loader, feat=True):
         logits = output
 
         # 温度スケーリング
-        tau = 0.1
+        # tau = 0.1
+        tau = opt.temp_prco_efm
         logits = logits / tau
 
         # log-softmax と確率
@@ -86,7 +87,7 @@ def postprocess_prco(opt, model, train_loader, feat=True):
                     g_bc_full = torch.autograd.grad(logp[b, c], features, retain_graph=True, create_graph=False)[0]  # (B, D)
                 else:
                     g_bc_full = torch.autograd.grad(logp[b, c], encoded, retain_graph=True, create_graph=False)[0]  # (B, D)
-                    
+
                 g_bc = g_bc_full[b]   # (D,)
                 # print("g_bc: ", g_bc)
                 # print("g_bc.shape: ", g_bc.shape) # g_bc.shape:  torch.Size([128])
