@@ -28,7 +28,7 @@ export START_EPOCH=5
 export TEMP_PRCO=0.5
 export CURRENT_TEMP=0.2
 export PAST_TEMP=0.1
-export DISTILL_TYPE="EFCv2"    # PRD. EFC, ND
+export DISTILL_TYPE="EFC"    # PRD. EFC, ND
 export DISTILL_POWER=1.0
 
 

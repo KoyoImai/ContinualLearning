@@ -27,6 +27,8 @@ from dataloaders.dataloader_prcofimcl import set_linearloader_efm_cifar10, set_l
 # PRCO-PROGEFM
 from dataloaders.dataloader_prco_progefm import set_replayonly_loader_cifar100
 
+# debug
+from dataloaders.dataloader_prco_progefm import set_debugloader_co2l_cifar100
 
 
 
@@ -153,7 +155,7 @@ def set_loader(opt, model, replay_indices, method_tools):
             val_loader = set_valloader_co2l_cifar100(opt=opt, normalize=normalize)
             linear_loader = set_linearloader_efm_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices)
 
-            replay_loader = set_replayonly_loader_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices)
+            replay_loader = None
 
         elif opt.dataset == "tiny-imagenet":
             train_loader, subset_indices, subset_sample_num = set_loader_prco_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices, model=model)
@@ -173,21 +175,21 @@ def set_loader(opt, model, replay_indices, method_tools):
         elif opt.dataset == "cifar100":
             train_loader, subset_indices, subset_sample_num = set_loader_prco_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices, model=model, training=True)
             val_loader = set_valloader_co2l_cifar100(opt=opt, normalize=normalize)
-            linear_loader = set_linearloader_co2l_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices)
+
+            # linear_loader = set_linearloader_co2l_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices)
+            linear_loader = set_debugloader_co2l_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices)
+
+            replay_loader = set_replayonly_loader_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices, model=model)
+
+
+
         elif opt.dataset == "tiny-imagenet":
             train_loader, subset_indices, subset_sample_num = set_loader_prco_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices, model=model)
             # val_loader = set_valloader_co2l_tinyimagenet(opt=opt, normalize=normalize)
             linear_loader = set_linearloader_co2l_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices)
             val_loader = None
-        
-        replay_loader = None
+      
 
-
-
-        
-
-
-    
 
     # データ拡張も特に加えていない現在タスクのデータローダ
     # （gpmのメモリ更新などで普通の画像が必要な手法用）

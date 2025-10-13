@@ -8,7 +8,7 @@ from train.train_cclis import train_cclis, val_cclis, ncm_cclis, adjust_learning
 from train.train_prco import train_prco, adjust_learning_rate_prco
 from train.train_prco_fimcl import train_prco_fimcl
 from train.train_prco_fimclv2 import train_prco_fimclv2
-from train.train_prco_progefm import train_prco_progefm
+from train.train_prco_progefm import train_prco_progefm, update_efn
 
 
 logger = logging.getLogger(__name__)
@@ -93,16 +93,13 @@ def train(opt, model, model2, criterion, optimizer, scheduler, dataloader, epoch
         loss, model2 = train_prco_progefm(opt=opt, model=model, model2=model2, criterion=criterion,
                                           optimizer=optimizer, train_loader=train_loader, epoch=epoch)
         
-        if epoch % opt.update_efm_freq == 0:
-            assert False
+        if (epoch % opt.update_efm_freq == 0) and (opt.target_task != 0):
+            update_efn(opt=opt, model=model, train_loader=replay_loader, feat=True)
 
         
     else:
 
         assert False
-
-
-
 
 
 
