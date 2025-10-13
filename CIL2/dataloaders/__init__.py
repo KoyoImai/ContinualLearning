@@ -176,8 +176,8 @@ def set_loader(opt, model, replay_indices, method_tools):
             train_loader, subset_indices, subset_sample_num = set_loader_prco_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices, model=model, training=True)
             val_loader = set_valloader_co2l_cifar100(opt=opt, normalize=normalize)
 
-            # linear_loader = set_linearloader_co2l_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices)
-            linear_loader = set_debugloader_co2l_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices)
+            linear_loader = set_linearloader_co2l_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices)
+            # linear_loader = set_debugloader_co2l_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices)
 
             replay_loader = set_replayonly_loader_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices, model=model)
 
