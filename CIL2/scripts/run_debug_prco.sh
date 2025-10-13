@@ -44,21 +44,18 @@ export VAL_FREQ=1000
 # python main.py --method prco --dataset cifar10 --distill_type None --cosine --start_epoch 11 --epochs 11 --val_freq 10 --linear_epochs 3 --log_name test --date 0906
 
 
-python main.py --method ${METHOD} --mem_type ${MEM_TYPE} --mem_size ${MEM_SIZE} --dataset ${DATASET} --seed ${SEED} --log_name ${LOG_NAME} --date ${DATE} \
-                --batch_size ${BATCH_SIZE} --learning_rate ${LEARNING_RATE} --learning_rate_prototypes ${LEARNING_RATE_PROTOTYPES} \
-                --epochs ${EPOCHS} --start_epoch ${START_EPOCH} \
-                --temp_prco ${TEMP_PRCO} --current_temp ${CURRENT_TEMP} --past_temp ${PAST_TEMP} --distill_type ${DISTILL_TYPE} --distill_power ${DISTILL_POWER} \
-                --linear_learning_rate ${LINEAR_LEARNING_RATE} --linear_epochs ${LINEAR_EPOCHS} --val_freq ${VAL_FREQ} \
-                --epoch_save --cosine 
+# python main.py --method ${METHOD} --mem_type ${MEM_TYPE} --mem_size ${MEM_SIZE} --dataset ${DATASET} --seed ${SEED} --log_name ${LOG_NAME} --date ${DATE} \
+#                 --batch_size ${BATCH_SIZE} --learning_rate ${LEARNING_RATE} --learning_rate_prototypes ${LEARNING_RATE_PROTOTYPES} \
+#                 --epochs ${EPOCHS} --start_epoch ${START_EPOCH} \
+#                 --temp_prco ${TEMP_PRCO} --current_temp ${CURRENT_TEMP} --past_temp ${PAST_TEMP} --distill_type ${DISTILL_TYPE} --distill_power ${DISTILL_POWER} \
+#                 --linear_learning_rate ${LINEAR_LEARNING_RATE} --linear_epochs ${LINEAR_EPOCHS} --val_freq ${VAL_FREQ} \
+#                 --epoch_save --cosine 
 
 
-# python main_linear.py --method ${METHOD} --mem_type ${MEM_TYPE} --mem_size ${MEM_SIZE} --dataset ${DATASET} --seed ${SEED} --log_name ${LOG_NAME} --date ${DATE} \
-#                 --linear_learning_rate ${LINEAR_LEARNING_RATE} --linear_epochs ${LINEAR_EPOCHS} \
-#                 --target_task 0 --target_epoch 3
+python main_linear.py --method ${METHOD} --mem_type ${MEM_TYPE} --mem_size ${MEM_SIZE} --dataset ${DATASET} --seed ${SEED} --log_name ${LOG_NAME} --date ${DATE} \
+                --linear_learning_rate ${LINEAR_LEARNING_RATE} --linear_epochs ${LINEAR_EPOCHS} \
+                --target_task 0 --target_epoch 3
 
-# python main_ncm.py --method ${METHOD} --mem_type ${MEM_TYPE} --mem_size ${MEM_SIZE} --dataset ${DATASET} --seed ${SEED} --log_name ${LOG_NAME} --date ${DATE} \
-#                 --linear_learning_rate ${LINEAR_LEARNING_RATE} --linear_epochs ${LINEAR_EPOCHS} \
-#                 --target_task 0 --target_epoch 3
 
 
 
