@@ -165,19 +165,21 @@ def set_loader(opt, model, replay_indices, method_tools):
 
             replay_loader = None
 
-    elif opt.method in ["prco-progefm"]:
+    elif opt.method in ["prco-progefm", "prco-ema"]:
 
         if opt.dataset == "cifar10":
             train_loader, subset_indices, subset_sample_num = set_loader_prco_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices, model=model, training=True)
             val_loader = set_valloader_co2l_cifar10(opt=opt, normalize=normalize)
             linear_loader = set_linearloader_co2l_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices)
+            replay_loader = None
+
 
         elif opt.dataset == "cifar100":
             train_loader, subset_indices, subset_sample_num = set_loader_prco_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices, model=model, training=True)
             val_loader = set_valloader_co2l_cifar100(opt=opt, normalize=normalize)
 
             linear_loader = set_linearloader_co2l_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices)
-            # linear_loader = set_debugloader_co2l_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices)
+            # linear_loader = set_debugloader_co2l_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices)    # デバッグ用
 
             replay_loader = set_replayonly_loader_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices, model=model)
 
@@ -188,6 +190,7 @@ def set_loader(opt, model, replay_indices, method_tools):
             # val_loader = set_valloader_co2l_tinyimagenet(opt=opt, normalize=normalize)
             linear_loader = set_linearloader_co2l_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices)
             val_loader = None
+            replay_loader = None
       
 
 
@@ -436,7 +439,7 @@ def set_buffer(opt, model, prev_indices=None, method_tools=None):
         else:
             assert False
     
-    elif opt.method in ["prco-progefm"]:
+    elif opt.method in ["prco-progefm", "prco-ema"]:
 
         if opt.mem_type == "ring":
             from dataloaders.buffer_er import set_replay_samples_ring

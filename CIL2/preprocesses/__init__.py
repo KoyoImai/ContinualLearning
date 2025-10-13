@@ -22,7 +22,7 @@ def pre_process(opt, model, model2, dataloader, method_tools):
 
         return method_tools, model, model2
 
-    elif opt.method in ["prco-progefm"]:
+    elif opt.method in ["prco-progefm", "prco-ema"]:
 
         preprocess_prco(opt, model, method_tools)
 

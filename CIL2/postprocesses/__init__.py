@@ -6,6 +6,7 @@ from util import save_model
 from postprocesses.postprocess_cclis import postprocess_cclis
 from postprocesses.postprocess_prco import postprocess_prco
 from postprocesses.postprocess_prco_fimcl import postprocess_prco as postprocess_prco_fimcl
+from postprocesses.postprocess_prco_ema import postprocess_prco as postprocess_prco_ema
 
 
 
@@ -88,6 +89,16 @@ def post_process(opt, model, model2, dataloader, criterion, optimizer, method_to
 
         elif opt.distill_type == "EFCv2":
             postprocess_prco(opt=opt, model=model, train_loader=linear_loader, feat=False)
+
+        return 
+
+    elif opt.method in ["prco-ema"]:
+        if opt.distill_type == "EFC":
+            postprocess_prco_ema(opt=opt, model=model, train_loader=linear_loader, feat=True)
+
+
+        elif opt.distill_type == "EFCv2":
+            postprocess_prco_ema(opt=opt, model=model, train_loader=linear_loader, feat=False)
 
         return 
     
