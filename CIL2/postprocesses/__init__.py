@@ -80,7 +80,14 @@ def post_process(opt, model, model2, dataloader, criterion, optimizer, method_to
             assert False
         return 
 
+    elif opt.method in ["prco-progefm"]:
+        if opt.distill_type == "EFC":
+            postprocess_prco(opt=opt, model=model, train_loader=linear_loader, feat=True)
 
+        elif opt.distill_type == "EFCv2":
+            postprocess_prco(opt=opt, model=model, train_loader=linear_loader, feat=False)
+
+        return 
     
     else:
         assert False

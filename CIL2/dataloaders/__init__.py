@@ -24,6 +24,10 @@ from dataloaders.dataloader_prco import set_loader_prco_debug_cifar10
 # PRCO-EFM
 from dataloaders.dataloader_prcofimcl import set_linearloader_efm_cifar10, set_linearloader_efm_cifar100, set_linearloader_efm_tinyimagenet
 
+# PRCO-PROGEFM
+from dataloaders.dataloader_prco_progefm import set_replayonly_loader_cifar100
+
+
 
 
 
@@ -77,6 +81,8 @@ def set_loader(opt, model, replay_indices, method_tools):
             # linear_loader = set_linearloader_co2l_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices)
             val_loader = None
             linear_loader = None
+        
+        replay_loader = None
 
 
     elif opt.method in ["cclis"]:
@@ -109,6 +115,8 @@ def set_loader(opt, model, replay_indices, method_tools):
         # method_tools["post_loader"] = post_loader
         model.module.subset_sample_num = subset_sample_num
         model.module.post_loader = post_loader
+
+        replay_loader = None
     
     elif opt.method in ["prco", "prco-fimcl", "prco-fimclv2", "prco-fimclv3"]:
 
@@ -127,6 +135,8 @@ def set_loader(opt, model, replay_indices, method_tools):
             linear_loader = set_linearloader_co2l_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices)
             val_loader = None
             # linear_loader = None
+        
+        replay_loader = None
     
 
     elif opt.method in ["prco-efm"]:
@@ -136,17 +146,41 @@ def set_loader(opt, model, replay_indices, method_tools):
             val_loader = set_valloader_co2l_cifar10(opt=opt, normalize=normalize)
             linear_loader = set_linearloader_efm_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices)
 
+            replay_loader = None
+
         elif opt.dataset == "cifar100":
             train_loader, subset_indices, subset_sample_num = set_loader_prco_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices, model=model, training=True)
             val_loader = set_valloader_co2l_cifar100(opt=opt, normalize=normalize)
             linear_loader = set_linearloader_efm_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices)
+
+            replay_loader = set_replayonly_loader_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices)
+
         elif opt.dataset == "tiny-imagenet":
             train_loader, subset_indices, subset_sample_num = set_loader_prco_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices, model=model)
             # val_loader = set_valloader_co2l_tinyimagenet(opt=opt, normalize=normalize)
             linear_loader = set_linearloader_efm_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices)
             val_loader = None
 
+            replay_loader = None
 
+    elif opt.method in ["prco-progefm"]:
+
+        if opt.dataset == "cifar10":
+            train_loader, subset_indices, subset_sample_num = set_loader_prco_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices, model=model, training=True)
+            val_loader = set_valloader_co2l_cifar10(opt=opt, normalize=normalize)
+            linear_loader = set_linearloader_co2l_cifar10(opt=opt, normalize=normalize, replay_indices=replay_indices)
+
+        elif opt.dataset == "cifar100":
+            train_loader, subset_indices, subset_sample_num = set_loader_prco_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices, model=model, training=True)
+            val_loader = set_valloader_co2l_cifar100(opt=opt, normalize=normalize)
+            linear_loader = set_linearloader_co2l_cifar100(opt=opt, normalize=normalize, replay_indices=replay_indices)
+        elif opt.dataset == "tiny-imagenet":
+            train_loader, subset_indices, subset_sample_num = set_loader_prco_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices, model=model)
+            # val_loader = set_valloader_co2l_tinyimagenet(opt=opt, normalize=normalize)
+            linear_loader = set_linearloader_co2l_tinyimagenet(opt=opt, normalize=normalize, replay_indices=replay_indices)
+            val_loader = None
+        
+        replay_loader = None
 
 
 
@@ -190,7 +224,7 @@ def set_loader(opt, model, replay_indices, method_tools):
 
 
 
-    dataloaders = {"train": train_loader, "val": val_loader, "linear": linear_loader, "ncm": ncm_loader, "taskil": taskil_loaders, "knn": knn_loaders}
+    dataloaders = {"train": train_loader, "val": val_loader, "linear": linear_loader, "ncm": ncm_loader, "taskil": taskil_loaders, "knn": knn_loaders, "replay": replay_loader}
 
     return dataloaders, subset_indices
 
@@ -390,6 +424,17 @@ def set_buffer(opt, model, prev_indices=None, method_tools=None):
         model.module.val_targets = val_targets
     
     elif opt.method in ["prco", "prco-fimcl", "prco-fimclv2", "prco-fimclv3", "prco-efm"]:
+
+        if opt.mem_type == "ring":
+            from dataloaders.buffer_er import set_replay_samples_ring
+            replay_indices = set_replay_samples_ring(opt, model, prev_indices=prev_indices) 
+        elif opt.mem_type == "kmeans":
+            from dataloaders.buffer_er import set_replay_samples_kmeans
+            replay_indices = set_replay_samples_kmeans(opt, model, prev_indices=prev_indices) 
+        else:
+            assert False
+    
+    elif opt.method in ["prco-progefm"]:
 
         if opt.mem_type == "ring":
             from dataloaders.buffer_er import set_replay_samples_ring

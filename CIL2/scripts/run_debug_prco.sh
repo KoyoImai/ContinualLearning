@@ -6,7 +6,7 @@ export CUDA_VISIBLE_DEVICES="3"
 
 
 # 基本設定（log_name関連）
-export METHOD="prco-efm"
+export METHOD="prco-progefm"
 export MEM_TYPE="kmeans"
 export MEM_SIZE=500
 export DATASET="cifar100"

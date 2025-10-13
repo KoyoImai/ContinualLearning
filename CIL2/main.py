@@ -29,7 +29,8 @@ def parse_option():
 
     # 基本的な実験設定
     parser.add_argument("--log_name", type=str, default="test")
-    parser.add_argument('--method', type=str, default='cclis', choices=['er', 'co2l', 'cclis', 'prco', 'prco-fimcl', 'prco-fimclv2', 'prco-fimclv3', 'prco-efm'])
+    parser.add_argument('--method', type=str, default='cclis', choices=['er', 'co2l', 'cclis', 'prco', 'prco-fimcl', 'prco-fimclv2', 'prco-fimclv3', 'prco-efm',
+                                                                        'prco-progefm'])
 
     # データセット関連
     parser.add_argument('--data_folder', type=str, default='/home/kouyou/Datasets/', help='path to custom dataset')
@@ -82,6 +83,9 @@ def parse_option():
     parser.add_argument('--eta_efm', type=float, default=0.1)
     parser.add_argument('--add_epoch', type=int, default=40)   # PRCO-fimclv2で追加学習を行うエポック数
     parser.add_argument('--add_learning_rate', type=float, default=0.1)
+
+    parser.add_argument('--update_efm_freq', type=int, default=1)
+    parser.add_argument('--update_efm_epoch', type=int, default=1)
 
     
 
@@ -284,6 +288,37 @@ def make_setup(opt):
                             weight_decay=opt.weight_decay)
         method_tools = {"optimizer": optimizer}
     
+    elif opt.method in ["prco-progefm"]:
+
+        from losses.loss_prco import ProtoSupConLoss
+
+        if opt.dataset in ["cifar10", "cifar100", "tiny-imagenet"]:
+            from models.resnet_cifar_prco_progefm import SupConResNet
+        elif opt.dataset in ["imagenet"]:
+            assert False
+
+        model = SupConResNet(name='resnet18', head='mlp', feat_dim=opt.feat_dim, seed=opt.seed, opt=opt)
+        model2 = SupConResNet(name='resnet18', head='mlp', feat_dim=opt.feat_dim, seed=opt.seed, opt=opt)
+        criterion = ProtoSupConLoss(temperature=opt.temp_prco, opt=opt)
+
+        if 'prototypes.weight' in model.state_dict().keys():
+            optimizer = optim.SGD([
+                            {'params': model.encoder.parameters()},
+                            {'params': model.head.parameters()},
+                            {'params': model.prototypes.parameters(), 'lr': opt.learning_rate_prototypes},
+                            ],
+                            lr=opt.learning_rate,
+                            momentum=opt.momentum,
+                            weight_decay=opt.weight_decay)
+        else:
+            learning_rate =  opt.learning_rate
+            optimizer = optim.SGD(model.parameters(),
+                            lr=learning_rate,
+                            momentum=opt.momentum,
+                            weight_decay=opt.weight_decay)
+        method_tools = {"optimizer": optimizer}
+
+
     else:
 
         assert False
@@ -321,7 +356,7 @@ def make_scheduler(opt, epochs, dataloader, method_tools):
     elif opt.method in ["cclis"]:
         scheduler = None
 
-    elif opt.method in ["prco", "prco-fimcl", "prco-fimclv2", "prco-fimclv3", "prco-efm"]:
+    elif opt.method in ["prco", "prco-fimcl", "prco-fimclv2", "prco-fimclv3", "prco-efm", "prco-progefm"]:
         scheduler = None
     
     else:
