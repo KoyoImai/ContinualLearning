@@ -30,7 +30,6 @@ def postprocess_prco(opt, model, train_loader, feat=True):
         # print("labels.shape: ", labels.shape)    # labels.shape:  torch.Size([512])
 
         # 特徴量獲得
-        # with torch.no_grad():  # with torch.no_grad()は，2025/10/13に追加
         encoded, features, output, _, _, _ = model(images)
         # print("features.shape: ", features.shape)   # features.shape:  torch.Size([512, 128])
         # print("output.shape: ", output.shape)       # output.shape:  torch.Size([512, 10])

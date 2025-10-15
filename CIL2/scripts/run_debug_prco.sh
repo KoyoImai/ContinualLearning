@@ -28,10 +28,10 @@ export START_EPOCH=5
 export TEMP_PRCO=0.5
 export CURRENT_TEMP=0.2
 export PAST_TEMP=0.1
-export DISTILL_TYPE="EFC"    # PRD. EFC, ND
+export DISTILL_TYPE="PRD"    # PRD. EFC, ND
 export DISTILL_POWER=1.0
 
-export EMA_DISTILL_TYPE="ND"
+export EMA_DISTILL_TYPE="PRD"
 
 
 # 線形分類関連のハイパラ
@@ -52,7 +52,7 @@ python main.py --method ${METHOD} --mem_type ${MEM_TYPE} --mem_size ${MEM_SIZE} 
                 --temp_prco ${TEMP_PRCO} --current_temp ${CURRENT_TEMP} --past_temp ${PAST_TEMP} --distill_type ${DISTILL_TYPE} --distill_power ${DISTILL_POWER} \
                 --ema_distill_type ${EMA_DISTILL_TYPE} \
                 --linear_learning_rate ${LINEAR_LEARNING_RATE} --linear_epochs ${LINEAR_EPOCHS} --val_freq ${VAL_FREQ} \
-                --epoch_save --cosine 
+                --epoch_save --cosine --emamodel_reset
 
 
 # python main_linear.py --method ${METHOD} --mem_type ${MEM_TYPE} --mem_size ${MEM_SIZE} --dataset ${DATASET} --seed ${SEED} --log_name ${LOG_NAME} --date ${DATE} \

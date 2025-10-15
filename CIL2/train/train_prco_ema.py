@@ -6,6 +6,8 @@ import math
 import logging
 import numpy as np
 from tqdm import tqdm
+from collections import defaultdict
+
 
 import torch
 import torch.optim as optim
@@ -15,6 +17,7 @@ import torch.optim.lr_scheduler as lr_scheduler
 
 from util import AverageMeter, write_csv
 from models.resnet_cifar_co2l import LinearClassifier
+from train.utils import ncm_classify
 
 from sklearn.neighbors import KNeighborsClassifier
 
@@ -178,7 +181,7 @@ def train_prco_ema(opt, model, model2, criterion, optimizer, train_loader, epoch
                 # ==================================              
                 with torch.no_grad():
                     # 過去モデルで過去クラスに対応したプロトタイプの出力を計算
-                    _, _, sim2_prev_task = model2(images)
+                    _, _, sim2_prev_task, _, _, _ = model2(images)
                     sim2_prev_task = sim2_prev_task.T
                     sim2_prev_task = torch.matmul(prototypes_mask, sim2_prev_task)
                     features2_sim = torch.div(sim2_prev_task, opt.past_temp)
@@ -270,6 +273,9 @@ def train_prco_ema(opt, model, model2, criterion, optimizer, train_loader, epoch
                 print("loss_distill: ", loss_distill)
         
 
+        # =================================
+        # EMAモデルとの知識蒸留
+        # =================================
         if  ema_distill_type == "ND":
 
             if opt.target_task > 0:
@@ -284,6 +290,65 @@ def train_prco_ema(opt, model, model2, criterion, optimizer, train_loader, epoch
                 loss += opt.ema_distill_power * loss_ema_distill
                 distill.update(loss_ema_distill.item(), bsz)
                 print("loss_ema_distill: ", loss_ema_distill)
+        
+        elif ema_distill_type == "PRD":
+
+            if opt.target_task > 0:
+
+                # バッチに含まれるラベル一覧
+                all_labels = torch.unique(labels).view(-1, 1)
+
+                # 過去タスクのラベル一覧
+                prev_all_labels = torch.arange(target_labels[0])
+
+                # プロトタイプマスクを作成
+                prototypes_mask = torch.scatter(
+                    torch.zeros(len(prev_all_labels), opt.n_cls).float(),
+                    1,
+                    prev_all_labels.view(-1,1),
+                    1
+                ).to(device)
+
+                # 過去タスクのサンプルだけを選別するマスク
+                labels_mask = labels < min(target_labels)
+
+                # ==================================
+                # PRD (現在モデルの出力)
+                # ==================================
+                # 現在モデルで過去クラスに対応したプロトタイプの出力を計算
+                sim_prev_task = torch.matmul(prototypes_mask, output)              # output から 過去クラスに対応した出力のみ取り出す
+                features1_sim = torch.div(sim_prev_task, opt.current_temp)         # 温度パラメータで除算
+
+                # 数値安定化
+                logits_max1, _ = torch.max(features1_sim, dim=0, keepdim=True)
+                features1_sim = features1_sim - logits_max1.detach()  # number stability
+
+                row_size = features1_sim.size(0)
+                # print("row_size: ", row_size)      # row_size:  2
+
+                # logits を計算
+                logits1 = torch.exp(features1_sim) / torch.exp(features1_sim).sum(dim=0, keepdim=True)
+
+
+                # ==================================
+                # PRD （EMAモデルの出力）
+                # ==================================
+                sim_prev_task_ema = torch.matmul(prototypes_mask, output_ema.T)
+                features_sim_ema = torch.div(sim_prev_task_ema, opt.current_temp)         # 温度パラメータで除算
+
+                # 数値安定化
+                logits_max_ema, _ = torch.max(features_sim_ema, dim=0, keepdim=True)
+                features_sim_ema = features_sim_ema - logits_max_ema.detach()              # number stability
+
+                # logitsを計算
+                logits_ema = torch.exp(features_sim_ema) / torch.exp(features_sim_ema).sum(dim=0, keepdim=True)
+
+                # 蒸留損失を計算（KL-Divergence）
+                loss_distill_ema = (-logits_ema * torch.log(logits1)).sum(0).mean()
+
+                write_csv(loss_distill_ema.item(), opt.result_path, "ema_distill_loss", opt.target_task, epoch)
+                loss += opt.distill_power * loss_distill_ema
+                distill.update(loss_distill_ema.item(), bsz)
 
         
         losses.update(loss.item(), bsz)
@@ -824,3 +889,149 @@ def val_prco4timnet(opt, model, model2, linear_loader, val_loader, taskil_loader
 
     return classil_acc, taskil_acc, all_task_accuracies, classifier
     # return classil_acc, taskil_acc, classifier
+
+
+
+
+def ncm_prco_ema(opt, model, ncm_loader, val_loader, ema=False):
+
+    # modelをevalモードに変更
+    model.eval()
+
+    # train_features = defaultdict(list)
+    train_encoded = defaultdict(list)
+
+
+    # ==========================================================
+    # 訓練用データから平均特徴を計算
+    # ==========================================================
+    with torch.no_grad():
+        for idx, (images, labels) in enumerate(ncm_loader):
+
+            # gpu上に配置
+            if torch.cuda.is_available():
+                images = images.cuda(non_blocking=True)
+                labels = labels.cuda(non_blocking=True)
+            
+            # 特徴量を取り出す
+            # features, encoded = model(images, return_feat=True)
+            if not ema:
+                encoded = model.module.encoder(images)
+            else:
+                encoded = model.module.encoder_ema(images)
+
+
+            # features と encoded を格納する
+            for enc, lbl in zip(encoded, labels):
+                train_encoded[int(lbl.item())].append(enc.detach().cpu())
+    
+
+    # ==========================================================
+    # 各クラスの平均特徴を計算
+    # ==========================================================
+    class_mean_encoded = {}
+
+    for cls in train_encoded.keys():
+        # torch.stack で [N, feature_dim] にまとめ、meanで平均を計算
+        class_mean_encoded[cls] = torch.mean(torch.stack(train_encoded[cls]), dim=0)
+    
+
+
+    # ==========================================================
+    # 検証用データの特徴量を取り出す
+    # ==========================================================
+    val_encoded = []
+    val_labels = []
+
+    with torch.no_grad():
+        for idx, (images, labels) in enumerate(val_loader):
+
+            # gpu上に配置
+            if torch.cuda.is_available():
+                images = images.cuda(non_blocking=True)
+                labels = labels.cuda(non_blocking=True)
+            
+            # 特徴量を取り出す
+            if not ema:
+                encoded = model.module.encoder(images)
+            else:
+                encoded = model.module.encoder_ema(images)
+
+            # CPUに戻してリストに追加
+            val_encoded.append(encoded.detach().cpu())
+            val_labels.append(labels.detach().cpu())
+    
+    # 各バッチを結合して1つのテンソルにまとめる
+    val_encoded = torch.cat(val_encoded, dim=0)     # shape: [num_val_samples, encoded_dim]
+    val_labels = torch.cat(val_labels, dim=0)       # shape: [num_val_samples]
+
+    print("=== 検証データ ===")
+    print("val_encoded.shape:", val_encoded.shape)
+    print("val_labels.shape:", val_labels.shape)
+
+
+
+    # NCM分類を実行して精度を計算
+    # ==========================================================
+    pred_labels_euclidean, acc_euclidean = ncm_classify(val_encoded, val_labels, class_mean_encoded, metric="euclidean")
+    pred_labels_cosine, acc_cosine = ncm_classify(val_encoded, val_labels, class_mean_encoded, metric="cosine")
+    
+    
+    # タスク増加での精度を計算
+    task_acc_euclidean = []
+    task_acc_cosine = []
+
+    for taskid in range(opt.target_task + 1):
+        start_class = taskid * opt.cls_per_task
+        end_class   = (taskid + 1) * opt.cls_per_task
+
+        # 該当タスクの検証データを抽出
+        mask = (val_labels >= start_class) & (val_labels < end_class)
+        task_val_encoded = val_encoded[mask]
+        task_val_labels  = val_labels[mask]
+
+        if len(task_val_labels) == 0:
+            print(f"Task {taskid}: 検証データなし")
+            continue
+
+        # 該当クラスの平均特徴を抽出
+        task_class_mean_encoded = {cls: class_mean_encoded[cls] 
+                                   for cls in range(start_class, end_class) 
+                                   if cls in class_mean_encoded}
+
+        # NCM分類を実行
+        pred_euc, acc_euc = ncm_classify(task_val_encoded, task_val_labels, task_class_mean_encoded, metric="euclidean")
+        pred_cos, acc_cos = ncm_classify(task_val_encoded, task_val_labels, task_class_mean_encoded, metric="cosine")
+
+        task_acc_euclidean.append(acc_euc)
+        task_acc_cosine.append(acc_cos)
+
+        print(f"[Task {taskid}] Euclidean: {acc_euc:.4f}, Cosine: {acc_cos:.4f}")
+
+
+    # 全体の平均精度
+    mean_acc_euc = sum(task_acc_euclidean) / len(task_acc_euclidean)
+    mean_acc_cos = sum(task_acc_cosine) / len(task_acc_cosine)
+
+    pred_labels_euclidean, acc_euclidean = ncm_classify(val_encoded, val_labels, class_mean_encoded, metric="euclidean")
+    pred_labels_cosine, acc_cosine = ncm_classify(val_encoded, val_labels, class_mean_encoded, metric="cosine")
+
+    
+    print("=== Summary ===")
+    print("acc_euclidean: ", acc_euclidean)
+    print("acc_cosine: ", acc_cosine)
+    print("Task-wise Euclidean acc:", task_acc_euclidean)
+    print("Task-wise Cosine acc   :", task_acc_cosine)
+    print("Mean Euclidean acc:", mean_acc_euc)
+    print("Mean Cosine acc   :", mean_acc_cos)
+    
+    
+
+    return acc_euclidean, acc_cosine, task_acc_euclidean, task_acc_cosine
+
+
+
+
+
+
+

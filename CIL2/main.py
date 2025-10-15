@@ -29,7 +29,18 @@ def parse_option():
 
     # 基本的な実験設定
     parser.add_argument("--log_name", type=str, default="test")
-    parser.add_argument('--method', type=str, default='cclis', choices=['er', 'co2l', 'cclis', 'prco', 'prco-fimcl', 'prco-fimclv2', 'prco-fimclv3', 'prco-efm', 'prco-progefm', 'prco-ema'])
+    parser.add_argument('--method', type=str, default='cclis', choices=['er', 'co2l', 'cclis', 'prco', 'prco-fimcl', 'prco-fimclv2', 'prco-fimclv3',
+                                                                        'prco-efm', 'prco-progefm', 'prco-ema'])
+    
+    # ---------------------------------------------------------------------
+    # prco-fimcl : 新知識獲得損失の特徴空間を非重要方向のサブスペースに射影して計算
+    # proc-fimclv2 : prco-fimclの学習後，特徴空間を一つにして全損失を計算し調整
+    # prco-fimclv3 : prco-fimclv2と学習率の変化を変更
+    # prco-efm : EFMの計算にシンプルなデータを使用（未データ拡張）
+    # prco-progefm : EFMを動的に変化させながら蒸留を実行
+    # prco-ema : EMAモデルを教師・生徒モデルとして採用
+    # --------------------------------------------------------------------- 
+
 
     # データセット関連
     parser.add_argument('--data_folder', type=str, default='/home/kouyou/Datasets/', help='path to custom dataset')
@@ -86,11 +97,11 @@ def parse_option():
     parser.add_argument('--update_efm_freq', type=int, default=1)
     parser.add_argument('--update_efm_epoch', type=int, default=1)
 
-    # PRCO-EMA用
+    # PRCO-EMA専用
     parser.add_argument('--ema_distill_type', type=str, default="ND")
     parser.add_argument('--ema_distill_power', type=float, default=0.1)
     parser.add_argument('--ema_momentum', type=float, default=0.999)
-
+    parser.add_argument('--emamodel_reset', action='store_true')
     
 
     # その他の設定

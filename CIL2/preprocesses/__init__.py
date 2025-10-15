@@ -22,7 +22,7 @@ def pre_process(opt, model, model2, dataloader, method_tools):
 
         return method_tools, model, model2
 
-    elif opt.method in ["prco-progefm", "prco-ema"]:
+    elif opt.method in ["prco-progefm"]:
 
         preprocess_prco(opt, model, method_tools)
 
@@ -31,8 +31,11 @@ def pre_process(opt, model, model2, dataloader, method_tools):
     elif opt.method in ["prco-ema"]:
 
         preprocess_prco(opt, model, method_tools)
-        model.module.reset_ema_model()
 
+        if (opt.target_task == 0) or opt.emamodel_reset:
+            model.module.reset_ema_model()
+        else:
+            assert False
         return method_tools, model, model2
 
 

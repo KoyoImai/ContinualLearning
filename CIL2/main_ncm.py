@@ -28,7 +28,7 @@ def parse_option():
 
     # 基本的な実験設定
     parser.add_argument("--log_name", type=str, default="test")
-    parser.add_argument('--method', type=str, default='cclis', choices=['er', 'co2l', 'cclis', 'prco', 'prco-fimclv2', 'prco-efm'])
+    parser.add_argument('--method', type=str, default='cclis', choices=['er', 'co2l', 'cclis', 'prco', 'prco-fimclv2', 'prco-efm', 'prco-ema'])
 
     # データセット関連
     parser.add_argument('--data_folder', type=str, default='/home/kouyou/Datasets/', help='path to custom dataset')
@@ -76,6 +76,7 @@ def parse_option():
     # parser.add_argument('--max_iter', type=int, default=5, help='iterations of the score computing')
 
     # prco
+    parser.add_argument('--ema_momentum', type=float, default=0.999)
     
 
     # その他の設定
@@ -182,6 +183,15 @@ def make_setup(opt):
 
         if opt.dataset in ["cifar10", "cifar100", "tiny-imagenet"]:
             from models.resnet_cifar_prco import SupConResNet
+        elif opt.dataset in ["imagenet"]:
+            assert False
+
+        model = SupConResNet(name='resnet18', head='mlp', feat_dim=opt.feat_dim, seed=opt.seed, opt=opt)
+    
+    elif opt.method in ['prco-ema']:
+
+        if opt.dataset in ["cifar10", "cifar100", "tiny-imagenet"]:
+            from models.resnet_cifar_prco_ema import SupConResNet
         elif opt.dataset in ["imagenet"]:
             assert False
 

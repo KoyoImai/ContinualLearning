@@ -9,7 +9,7 @@ from train.train_prco import train_prco, adjust_learning_rate_prco
 from train.train_prco_fimcl import train_prco_fimcl
 from train.train_prco_fimclv2 import train_prco_fimclv2
 from train.train_prco_progefm import train_prco_progefm, update_efn
-from train.train_prco_ema import train_prco_ema
+from train.train_prco_ema import train_prco_ema, ncm_prco_ema
 
 
 logger = logging.getLogger(__name__)
@@ -197,6 +197,15 @@ def eval_ncm(model, dataloader, opt):
     elif opt.method in ["prco", 'prco-fimclv2', 'prco-efm']:
 
         acc_euclidean, acc_cosine, task_acc_euclidean, task_acc_cosine = ncm_cclis(opt=opt, model=model, ncm_loader=ncm_loader, val_loader=val_loader)
+        write_csv(acc_euclidean, opt.result_path, "ncm_euclidean_acc", opt.target_task, opt.target_epoch)
+        write_csv(acc_cosine, opt.result_path, "ncm_cosine_acc", opt.target_task, opt.target_epoch)
+        write_csv(task_acc_euclidean, opt.result_path, "ncm_taskil_euclidean_acc", opt.target_task, opt.target_epoch)
+        write_csv(task_acc_cosine, opt.result_path, "ncm_taskil_cosine_acc", opt.target_task, opt.target_epoch)
+    
+
+    elif opt.method in ['prco-ema']:
+
+        acc_euclidean, acc_cosine, task_acc_euclidean, task_acc_cosine = ncm_prco_ema(opt=opt, model=model, ncm_loader=ncm_loader, val_loader=val_loader, ema=True)
         write_csv(acc_euclidean, opt.result_path, "ncm_euclidean_acc", opt.target_task, opt.target_epoch)
         write_csv(acc_cosine, opt.result_path, "ncm_cosine_acc", opt.target_task, opt.target_epoch)
         write_csv(task_acc_euclidean, opt.result_path, "ncm_taskil_euclidean_acc", opt.target_task, opt.target_epoch)
